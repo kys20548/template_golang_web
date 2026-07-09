@@ -11,6 +11,9 @@ type Config struct {
 	Environment       string        `mapstructure:"ENVIRONMENT"`
 	DBDriver          string        `mapstructure:"DB_DRIVER"`
 	DBSource          string        `mapstructure:"DB_SOURCE"`
+	DBMaxOpenConns    int           `mapstructure:"DB_MAX_OPEN_CONNS"`
+	DBMaxIdleConns    int           `mapstructure:"DB_MAX_IDLE_CONNS"`
+	DBConnMaxLifetime time.Duration `mapstructure:"DB_CONN_MAX_LIFETIME"`
 	HTTPServerAddress string        `mapstructure:"HTTP_SERVER_ADDRESS"`
 	RedisAddress      string        `mapstructure:"REDIS_ADDRESS"`
 	CORSAllowOrigins  string        `mapstructure:"CORS_ALLOW_ORIGINS"`

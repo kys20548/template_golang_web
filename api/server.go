@@ -1,6 +1,8 @@
 package api
 
 import (
+	"io"
+
 	"github.com/gin-gonic/gin"
 	"github.com/kys20548/template_golang_web/cache"
 	db "github.com/kys20548/template_golang_web/db/sqlc"
@@ -32,9 +34,22 @@ func (server *Server) setupRouter() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	// 不用 gin.Default()：以 zerolog middleware 取代 gin 內建 logger
+	// 不用 gin.Default()：以 zerolog middleware 取代 gin 內建 logger。
+	// recovery 用 CustomRecoveryWithWriter：panic 一律回統一格式給 client；
+	// server 端的 stack 在 development 用 gin 內建可讀格式印出，
+	// production 則丟掉 plain text，由 recoveryHandler 把 stack 記進 zerolog JSON
+	var recoveryWriter io.Writer = gin.DefaultErrorWriter
+	if server.config.Environment != "development" {
+		recoveryWriter = io.Discard
+	}
+
 	router := gin.New()
-	router.Use(httpLogger(), corsMiddleware(server.config), gin.Recovery())
+	router.Use(
+		requestIDMiddleware(),
+		httpLogger(),
+		corsMiddleware(server.config),
+		gin.CustomRecoveryWithWriter(recoveryWriter, recoveryHandler),
+	)
 
 	// 公開路由
 	router.GET("/healthz", server.healthCheck)

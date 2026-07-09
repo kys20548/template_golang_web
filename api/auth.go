@@ -13,7 +13,6 @@ import (
 	"github.com/kys20548/template_golang_web/cache"
 	"github.com/kys20548/template_golang_web/errcode"
 	"github.com/kys20548/template_golang_web/util"
-	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -76,7 +75,7 @@ func (server *Server) login(ctx *gin.Context) {
 
 	// 登入成功，清除失敗計數
 	if err := server.cache.Del(ctx, loginFailKey(req.Username)); err != nil {
-		log.Warn().Err(err).Msg("cannot clear login fail count")
+		getLogger(ctx).Warn().Err(err).Msg("cannot clear login fail count")
 	}
 
 	token := uuid.NewString()
@@ -112,9 +111,10 @@ func (server *Server) logout(ctx *gin.Context) {
 }
 
 // me 示範從 context 取出驗證層放入的登入者資訊。
+// log 用 getLogger 取 request-scoped logger，自動帶 request_id。
 func (server *Server) me(ctx *gin.Context) {
 	user := getAuthUser(ctx)
-	log.Info().
+	getLogger(ctx).Info().
 		Int64("user_id", user.UserID).
 		Str("username", user.Username).
 		Msg("get current user")
@@ -135,6 +135,6 @@ func (server *Server) getLoginFailCount(ctx *gin.Context, username string) (int6
 
 func (server *Server) recordLoginFail(ctx *gin.Context, username string) {
 	if _, err := server.cache.Incr(ctx, loginFailKey(username), loginFailTTL); err != nil {
-		log.Warn().Err(err).Msg("cannot record login fail count")
+		getLogger(ctx).Warn().Err(err).Msg("cannot record login fail count")
 	}
 }

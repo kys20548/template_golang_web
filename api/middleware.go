@@ -2,15 +2,19 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"runtime/debug"
 	"strings"
 	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/kys20548/template_golang_web/cache"
 	"github.com/kys20548/template_golang_web/errcode"
 	"github.com/kys20548/template_golang_web/util"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
@@ -21,6 +25,10 @@ const (
 	authUserKey = "auth_user"
 	// sessionKeyPrefix 為 token 存在 Redis 的 key 前綴。
 	sessionKeyPrefix = "session:"
+	// requestIDHeaderKey 為 request id 的 header 名稱，回應時帶回給 client。
+	requestIDHeaderKey = "X-Request-Id"
+	// requestIDKey 為 request id 存放在 gin context 的 key，也是 log 欄位名。
+	requestIDKey = "request_id"
 )
 
 // AuthUser 為登入者資訊，驗證通過後放入 context 供後續邏輯使用。
@@ -70,6 +78,47 @@ func getAuthUser(ctx *gin.Context) AuthUser {
 	return ctx.MustGet(authUserKey).(AuthUser)
 }
 
+// requestIDMiddleware 為每個請求產生唯一的 request id（client 有帶就沿用，
+// 方便跨服務串接），放進 response header 回給 client，並把帶有 request_id
+// 的 logger 放進 request context，同一請求的所有 log 都能用它串起來。
+// 對應 Java 的 MDC + traceId。
+func requestIDMiddleware() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		requestID := ctx.GetHeader(requestIDHeaderKey)
+		if requestID == "" {
+			requestID = uuid.NewString()
+		}
+
+		ctx.Set(requestIDKey, requestID)
+		ctx.Header(requestIDHeaderKey, requestID)
+
+		logger := log.With().Str(requestIDKey, requestID).Logger()
+		ctx.Request = ctx.Request.WithContext(logger.WithContext(ctx.Request.Context()))
+
+		ctx.Next()
+	}
+}
+
+// getLogger 取得帶 request_id 的 request-scoped logger，
+// handler 內記 log 一律用它，不要直接用全域的 log。
+func getLogger(ctx *gin.Context) *zerolog.Logger {
+	return log.Ctx(ctx.Request.Context())
+}
+
+// recoveryHandler 統一 panic 回應：gin.Recovery 只會回空 body 的 500，
+// 這裡改成回統一的 {code, msg, data} 格式。
+// stack 只在 production 記進 zerolog（單行 JSON 給 log 收集器）；
+// development 的 stack 由 gin 內建 writer 以可讀的多行格式印出（見 setupRouter）。
+func recoveryHandler(ctx *gin.Context, err any) {
+	event := getLogger(ctx).Error().Interface("panic", err)
+	if !gin.IsDebugging() {
+		event = event.Str("stack", string(debug.Stack()))
+	}
+	event.Msg("panic recovered")
+
+	failAbort(ctx, http.StatusInternalServerError, errcode.ErrInternal, fmt.Errorf("panic: %v", err))
+}
+
 // corsMiddleware 依設定允許跨域請求；CORS_ALLOW_ORIGINS 為 * 時允許所有來源，
 // 否則為逗號分隔的來源清單。
 func corsMiddleware(config util.Config) gin.HandlerFunc {
@@ -100,6 +149,7 @@ func httpLogger() gin.HandlerFunc {
 		}
 
 		logger.Str("protocol", "http").
+			Str(requestIDKey, ctx.GetString(requestIDKey)).
 			Str("method", ctx.Request.Method).
 			Str("path", ctx.Request.URL.Path).
 			Int("status_code", statusCode).

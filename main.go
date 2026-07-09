@@ -36,6 +36,12 @@ func main() {
 	}
 	defer conn.Close()
 
+	// 連線池設定：sql.DB 預設開啟連線數無上限，尖峰時會把 DB 塞爆；
+	// ConnMaxLifetime 讓連線定期換新，避免被 DB 或中間的 LB 靜默斷線
+	conn.SetMaxOpenConns(config.DBMaxOpenConns)
+	conn.SetMaxIdleConns(config.DBMaxIdleConns)
+	conn.SetConnMaxLifetime(config.DBConnMaxLifetime)
+
 	// 啟動檢查：DB 或 Redis 連不上就不啟動 HTTP server，
 	// 避免起了一個一定會噴錯的服務（sql.Open 是惰性的，要 Ping 才會真正連線）
 	pingCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
