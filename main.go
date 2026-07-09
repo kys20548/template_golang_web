@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/kys20548/template_golang_web/api"
 	"github.com/kys20548/template_golang_web/cache"
@@ -31,17 +32,27 @@ func main() {
 
 	conn, err := sql.Open(config.DBDriver, config.DBSource)
 	if err != nil {
-		log.Fatal().Err(err).Msg("cannot connect to db")
+		log.Fatal().Err(err).Msg("cannot open db")
 	}
 	defer conn.Close()
+
+	// 啟動檢查：DB 或 Redis 連不上就不啟動 HTTP server，
+	// 避免起了一個一定會噴錯的服務（sql.Open 是惰性的，要 Ping 才會真正連線）
+	pingCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := conn.PingContext(pingCtx); err != nil {
+		log.Fatal().Err(err).Msg("cannot connect to db")
+	}
+	log.Info().Msg("db connected")
 
 	store := db.NewStore(conn)
 
 	cacheStore := cache.NewRedisCache(config.RedisAddress)
-	if err := cacheStore.Ping(context.Background()); err != nil {
-		// Redis 掛掉不影響公開路由，只記 warning，需要驗證的路由會回 500
-		log.Warn().Err(err).Msg("cannot connect to redis")
+	if err := cacheStore.Ping(pingCtx); err != nil {
+		log.Fatal().Err(err).Msg("cannot connect to redis")
 	}
+	log.Info().Msg("redis connected")
 
 	server, err := api.NewServer(config, store, cacheStore)
 	if err != nil {
