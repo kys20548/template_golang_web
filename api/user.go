@@ -27,12 +27,15 @@ func (server *Server) createUser(ctx *gin.Context) {
 		return
 	}
 
-	arg := db.CreateUserParams{
-		Username: req.Username,
-		Email:    req.Email,
+	arg := db.CreateUserTxParams{
+		CreateUserParams: db.CreateUserParams{
+			Username: req.Username,
+			Email:    req.Email,
+		},
 	}
 
-	user, err := server.store.CreateUser(ctx, arg)
+	// 使用 transaction 同時建立使用者與錢包，任一步失敗都會 rollback
+	result, err := server.store.CreateUserTx(ctx, arg)
 	if err != nil {
 		var pqErr *pq.Error
 		if errors.As(err, &pqErr) && pqErr.Code.Name() == "unique_violation" {
@@ -43,7 +46,7 @@ func (server *Server) createUser(ctx *gin.Context) {
 		return
 	}
 
-	ok(ctx, user)
+	ok(ctx, result)
 }
 
 type getUserRequest struct {

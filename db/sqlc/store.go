@@ -10,6 +10,7 @@ import (
 // 內嵌 sqlc 產生的 Querier interface，方便 mock 測試。
 type Store interface {
 	Querier
+	CreateUserTx(ctx context.Context, arg CreateUserTxParams) (CreateUserTxResult, error)
 }
 
 // SQLStore 為 Store 的實際實作，操作真實的 PostgreSQL。

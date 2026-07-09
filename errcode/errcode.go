@@ -16,6 +16,9 @@ const (
 	// 使用者相關 2xxxx
 	ErrUserNotFound Code = 20001
 	ErrUserExists   Code = 20002
+
+	// 錢包相關 3xxxx
+	ErrWalletNotFound Code = 30001
 )
 
 var messages = map[Code]string{
@@ -26,6 +29,8 @@ var messages = map[Code]string{
 	ErrNotFound:      "資源不存在",
 	ErrUserNotFound:  "使用者不存在",
 	ErrUserExists:    "使用者已存在",
+
+	ErrWalletNotFound: "錢包不存在",
 }
 
 // Msg 回傳錯誤碼對應的訊息，未定義的碼回傳系統內部錯誤訊息。

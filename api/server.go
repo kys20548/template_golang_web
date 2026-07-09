@@ -44,6 +44,7 @@ func (server *Server) setupRouter() {
 	// 需要驗證的路由：header 帶 token，經 authMiddleware 驗證後才會進到 handler
 	authRoutes := router.Group("/").Use(authMiddleware(server.cache))
 	authRoutes.GET("/me", server.me)
+	authRoutes.GET("/wallet", server.getMyWallet)
 	authRoutes.GET("/users/:id", server.getUser)
 	authRoutes.GET("/users", server.listUsers)
 

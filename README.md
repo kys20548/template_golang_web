@@ -74,6 +74,7 @@ curl -X POST http://localhost:8080/login -d '{"username":"danny"}'
 
 # 需驗證的路由（header 帶 token）
 curl -H "token: <token>" http://localhost:8080/me
+curl -H "token: <token>" http://localhost:8080/wallet   # 查登入者自己的錢包（user 來自 context）
 curl -H "token: <token>" http://localhost:8080/users/1
 curl -H "token: <token>" 'http://localhost:8080/users?pageNum=1&pageSize=5'
 ```
