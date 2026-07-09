@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	"github.com/kys20548/template_golang_web/api"
+	"github.com/kys20548/template_golang_web/cache"
 	db "github.com/kys20548/template_golang_web/db/sqlc"
 	"github.com/kys20548/template_golang_web/util"
 	_ "github.com/lib/pq"
@@ -36,7 +37,13 @@ func main() {
 
 	store := db.NewStore(conn)
 
-	server, err := api.NewServer(config, store)
+	cacheStore := cache.NewRedisCache(config.RedisAddress)
+	if err := cacheStore.Ping(context.Background()); err != nil {
+		// Redis 掛掉不影響公開路由，只記 warning，需要驗證的路由會回 500
+		log.Warn().Err(err).Msg("cannot connect to redis")
+	}
+
+	server, err := api.NewServer(config, store, cacheStore)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot create server")
 	}

@@ -2,6 +2,7 @@ package api
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/kys20548/template_golang_web/cache"
 	db "github.com/kys20548/template_golang_web/db/sqlc"
 	"github.com/kys20548/template_golang_web/util"
 )
@@ -10,14 +11,16 @@ import (
 type Server struct {
 	config util.Config
 	store  db.Store
+	cache  cache.Cache
 	router *gin.Engine
 }
 
 // NewServer 建立 HTTP server 並設定路由。
-func NewServer(config util.Config, store db.Store) (*Server, error) {
+func NewServer(config util.Config, store db.Store, cacheStore cache.Cache) (*Server, error) {
 	server := &Server{
 		config: config,
 		store:  store,
+		cache:  cacheStore,
 	}
 
 	server.setupRouter()
@@ -33,11 +36,16 @@ func (server *Server) setupRouter() {
 	router := gin.New()
 	router.Use(httpLogger(), gin.Recovery())
 
+	// 公開路由
 	router.GET("/healthz", server.healthCheck)
-
 	router.POST("/users", server.createUser)
-	router.GET("/users/:id", server.getUser)
-	router.GET("/users", server.listUsers)
+	router.POST("/login", server.login)
+
+	// 需要驗證的路由：header 帶 token，經 authMiddleware 驗證後才會進到 handler
+	authRoutes := router.Group("/").Use(authMiddleware(server.cache))
+	authRoutes.GET("/me", server.me)
+	authRoutes.GET("/users/:id", server.getUser)
+	authRoutes.GET("/users", server.listUsers)
 
 	server.router = router
 }
@@ -45,8 +53,4 @@ func (server *Server) setupRouter() {
 // Router 回傳 gin engine，讓 main 可以把它掛到 http.Server 上做 graceful shutdown。
 func (server *Server) Router() *gin.Engine {
 	return server.router
-}
-
-func errorResponse(err error) gin.H {
-	return gin.H{"error": err.Error()}
 }

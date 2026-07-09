@@ -12,6 +12,8 @@ type Config struct {
 	DBDriver          string        `mapstructure:"DB_DRIVER"`
 	DBSource          string        `mapstructure:"DB_SOURCE"`
 	HTTPServerAddress string        `mapstructure:"HTTP_SERVER_ADDRESS"`
+	RedisAddress      string        `mapstructure:"REDIS_ADDRESS"`
+	TokenDuration     time.Duration `mapstructure:"TOKEN_DURATION"`
 	ShutdownTimeout   time.Duration `mapstructure:"SHUTDOWN_TIMEOUT"`
 }
 

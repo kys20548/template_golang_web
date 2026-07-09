@@ -7,10 +7,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	db "github.com/kys20548/template_golang_web/db/sqlc"
+	"github.com/kys20548/template_golang_web/errcode"
+	"github.com/lib/pq"
 )
 
 func (server *Server) healthCheck(ctx *gin.Context) {
-	ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
+	ok(ctx, "ok")
 }
 
 type createUserRequest struct {
@@ -21,7 +23,7 @@ type createUserRequest struct {
 func (server *Server) createUser(ctx *gin.Context) {
 	var req createUserRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, errorResponse(err))
+		fail(ctx, http.StatusBadRequest, errcode.ErrInvalidParams, err)
 		return
 	}
 
@@ -32,11 +34,16 @@ func (server *Server) createUser(ctx *gin.Context) {
 
 	user, err := server.store.CreateUser(ctx, arg)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		var pqErr *pq.Error
+		if errors.As(err, &pqErr) && pqErr.Code.Name() == "unique_violation" {
+			fail(ctx, http.StatusConflict, errcode.ErrUserExists, nil)
+			return
+		}
+		fail(ctx, http.StatusInternalServerError, errcode.ErrInternal, err)
 		return
 	}
 
-	ctx.JSON(http.StatusOK, user)
+	ok(ctx, user)
 }
 
 type getUserRequest struct {
@@ -46,45 +53,49 @@ type getUserRequest struct {
 func (server *Server) getUser(ctx *gin.Context) {
 	var req getUserRequest
 	if err := ctx.ShouldBindUri(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, errorResponse(err))
+		fail(ctx, http.StatusBadRequest, errcode.ErrInvalidParams, err)
 		return
 	}
 
 	user, err := server.store.GetUser(ctx, req.ID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			ctx.JSON(http.StatusNotFound, errorResponse(err))
+			fail(ctx, http.StatusNotFound, errcode.ErrUserNotFound, nil)
 			return
 		}
-		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		fail(ctx, http.StatusInternalServerError, errcode.ErrInternal, err)
 		return
 	}
 
-	ctx.JSON(http.StatusOK, user)
+	ok(ctx, user)
 }
 
 type listUsersRequest struct {
-	PageID   int32 `form:"page_id" binding:"required,min=1"`
-	PageSize int32 `form:"page_size" binding:"required,min=5,max=50"`
+	PageNum  int32 `form:"pageNum" binding:"required,min=1"`
+	PageSize int32 `form:"pageSize" binding:"required,min=5,max=50"`
 }
 
 func (server *Server) listUsers(ctx *gin.Context) {
 	var req listUsersRequest
 	if err := ctx.ShouldBindQuery(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, errorResponse(err))
+		fail(ctx, http.StatusBadRequest, errcode.ErrInvalidParams, err)
 		return
 	}
 
 	arg := db.ListUsersParams{
 		Limit:  req.PageSize,
-		Offset: (req.PageID - 1) * req.PageSize,
+		Offset: (req.PageNum - 1) * req.PageSize,
 	}
 
 	users, err := server.store.ListUsers(ctx, arg)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		fail(ctx, http.StatusInternalServerError, errcode.ErrInternal, err)
 		return
 	}
 
-	ctx.JSON(http.StatusOK, users)
+	ok(ctx, PageResult{
+		PageNum:  req.PageNum,
+		PageSize: req.PageSize,
+		List:     users,
+	})
 }
