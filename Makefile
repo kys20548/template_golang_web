@@ -1,4 +1,5 @@
 DB_URL=postgresql://root:secret@localhost:5432/template_golang_web?sslmode=disable
+GOBIN=$(shell go env GOPATH)/bin
 
 postgres:
 	docker compose up -d
@@ -18,10 +19,13 @@ migratedown:
 sqlc:
 	sqlc generate
 
+swagger:
+	$(GOBIN)/swag init --parseDependency --parseInternal
+
 server:
 	go run main.go
 
 test:
 	go test -v -cover ./...
 
-.PHONY: postgres createdb dropdb migrateup migratedown sqlc server test
+.PHONY: postgres createdb dropdb migrateup migratedown sqlc swagger server test

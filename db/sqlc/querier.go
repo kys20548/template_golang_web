@@ -9,13 +9,16 @@ import (
 )
 
 type Querier interface {
+	CountOperationLogs(ctx context.Context) (int64, error)
 	CountUsers(ctx context.Context) (int64, error)
+	CreateOperationLog(ctx context.Context, arg CreateOperationLogParams) (OperationLog, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateWallet(ctx context.Context, userID int64) (Wallet, error)
 	DeleteUser(ctx context.Context, id int64) error
 	GetUser(ctx context.Context, id int64) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
 	GetWalletByUserID(ctx context.Context, userID int64) (Wallet, error)
+	ListOperationLogs(ctx context.Context, arg ListOperationLogsParams) ([]OperationLog, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
 }
 

@@ -13,6 +13,13 @@ import (
 	"github.com/lib/pq"
 )
 
+// healthCheck 健康檢查。
+//
+// @Summary  健康檢查
+// @Tags     system
+// @Produce  json
+// @Success  200 {object} Response{data=string}
+// @Router   /healthz [get]
 func (server *Server) healthCheck(ctx *gin.Context) {
 	ok(ctx, "ok")
 }
@@ -45,6 +52,15 @@ type createUserResponse struct {
 	Wallet db.Wallet    `json:"wallet"`
 }
 
+// createUser 建立使用者，並在同一個 transaction 內建立錢包。
+//
+// @Summary  建立使用者
+// @Tags     user
+// @Accept   json
+// @Produce  json
+// @Param    body body createUserRequest true "使用者資料"
+// @Success  200 {object} Response{data=createUserResponse}
+// @Router   /users [post]
 func (server *Server) createUser(ctx *gin.Context) {
 	var req createUserRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -88,6 +104,15 @@ type getUserRequest struct {
 	ID int64 `uri:"id" binding:"required,min=1"`
 }
 
+// getUser 以 ID 查詢使用者。
+//
+// @Summary  查詢使用者
+// @Tags     user
+// @Produce  json
+// @Security TokenAuth
+// @Param    id path int true "使用者 ID"
+// @Success  200 {object} Response{data=userResponse}
+// @Router   /users/{id} [get]
 func (server *Server) getUser(ctx *gin.Context) {
 	var req getUserRequest
 	if err := ctx.ShouldBindUri(&req); err != nil {
@@ -113,6 +138,16 @@ type listUsersRequest struct {
 	PageSize int32 `form:"pageSize" binding:"required,min=5,max=50"`
 }
 
+// listUsers 分頁查詢使用者列表。
+//
+// @Summary  使用者列表
+// @Tags     user
+// @Produce  json
+// @Security TokenAuth
+// @Param    pageNum  query int true "頁碼（從 1 開始）"
+// @Param    pageSize query int true "每頁筆數（5-50）"
+// @Success  200 {object} Response{data=PageResult{list=[]userResponse}}
+// @Router   /users [get]
 func (server *Server) listUsers(ctx *gin.Context) {
 	var req listUsersRequest
 	if err := ctx.ShouldBindQuery(&req); err != nil {

@@ -38,6 +38,14 @@ type loginResponse struct {
 
 // login 驗證帳號密碼後產生 token，把 user 資訊存入 Redis。
 // 帳號不存在與密碼錯誤回同一個錯誤碼，避免洩漏帳號是否存在。
+//
+// @Summary  登入
+// @Tags     auth
+// @Accept   json
+// @Produce  json
+// @Param    body body loginRequest true "帳號密碼"
+// @Success  200 {object} Response{data=loginResponse}
+// @Router   /login [post]
 func (server *Server) login(ctx *gin.Context) {
 	var req loginRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -101,6 +109,13 @@ func (server *Server) login(ctx *gin.Context) {
 
 // logout 刪除 Redis 上的 session，token 立即失效。
 // 能走到這裡表示已通過 authMiddleware，header 上必有有效 token。
+//
+// @Summary  登出
+// @Tags     auth
+// @Produce  json
+// @Security TokenAuth
+// @Success  200 {object} Response
+// @Router   /logout [post]
 func (server *Server) logout(ctx *gin.Context) {
 	token := ctx.GetHeader(tokenHeaderKey)
 	if err := server.cache.Del(ctx, sessionKey(token)); err != nil {
@@ -112,6 +127,13 @@ func (server *Server) logout(ctx *gin.Context) {
 
 // me 示範從 context 取出驗證層放入的登入者資訊。
 // log 用 getLogger 取 request-scoped logger，自動帶 request_id。
+//
+// @Summary  取得登入者資訊
+// @Tags     auth
+// @Produce  json
+// @Security TokenAuth
+// @Success  200 {object} Response{data=AuthUser}
+// @Router   /me [get]
 func (server *Server) me(ctx *gin.Context) {
 	user := getAuthUser(ctx)
 	getLogger(ctx).Info().

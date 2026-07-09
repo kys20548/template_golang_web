@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"github.com/kys20548/template_golang_web/cache"
 	db "github.com/kys20548/template_golang_web/db/sqlc"
 	"github.com/kys20548/template_golang_web/util"
@@ -57,7 +59,13 @@ func (server *Server) setupRouter() {
 		timeoutMiddleware(server.config.APITimeout),
 		corsMiddleware(server.config),
 		gin.CustomRecoveryWithWriter(recoveryWriter, recoveryHandler),
+		auditLogMiddleware(server.store),
 	)
+
+	// Swagger 文件只在 development 提供，production 不對外暴露 API 結構
+	if server.config.Environment == "development" {
+		router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	}
 
 	// 公開路由
 	router.GET("/healthz", server.healthCheck)
@@ -72,6 +80,7 @@ func (server *Server) setupRouter() {
 	authRoutes.GET("/users/:id", server.getUser)
 	// 個別路由範例：超過 2s 印 slow request WARN log（不中斷請求）
 	authRoutes.GET("/users", slowLogMiddleware(2000*time.Millisecond), server.listUsers)
+	authRoutes.GET("/operation-logs", server.listOperationLogs)
 
 	server.router = router
 }

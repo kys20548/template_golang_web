@@ -13,12 +13,23 @@ import (
 	"github.com/kys20548/template_golang_web/api"
 	"github.com/kys20548/template_golang_web/cache"
 	db "github.com/kys20548/template_golang_web/db/sqlc"
+	_ "github.com/kys20548/template_golang_web/docs"
 	"github.com/kys20548/template_golang_web/util"
 	_ "github.com/lib/pq"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
+// @title           template_golang_web API
+// @version         1.0
+// @description     Golang Web 專案模板 API 文件。所有回應皆為統一格式 {code, msg, data}。
+// @host            localhost:8080
+// @BasePath        /
+//
+// @securityDefinitions.apikey TokenAuth
+// @in   header
+// @name token
+// @description 登入後取得的 token，需驗證的 API 都要在 header 帶上
 func main() {
 	config, err := util.LoadConfig(".")
 	if err != nil {

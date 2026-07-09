@@ -5,8 +5,21 @@
 package db
 
 import (
+	"database/sql"
 	"time"
 )
+
+type OperationLog struct {
+	ID          int64         `json:"id"`
+	UserID      sql.NullInt64 `json:"user_id"`
+	Username    string        `json:"username"`
+	Method      string        `json:"method"`
+	Path        string        `json:"path"`
+	RequestBody string        `json:"request_body"`
+	StatusCode  int32         `json:"status_code"`
+	RequestID   string        `json:"request_id"`
+	CreatedAt   time.Time     `json:"created_at"`
+}
 
 type User struct {
 	ID             int64     `json:"id"`
