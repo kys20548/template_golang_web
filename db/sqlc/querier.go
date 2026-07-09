@@ -9,6 +9,7 @@ import (
 )
 
 type Querier interface {
+	CountUsers(ctx context.Context) (int64, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateWallet(ctx context.Context, userID int64) (Wallet, error)
 	DeleteUser(ctx context.Context, id int64) error

@@ -14,8 +14,10 @@ const (
 	ErrNotFound      Code = 10004
 
 	// 使用者相關 2xxxx
-	ErrUserNotFound Code = 20001
-	ErrUserExists   Code = 20002
+	ErrUserNotFound      Code = 20001
+	ErrUserExists        Code = 20002
+	ErrWrongCredentials  Code = 20003
+	ErrTooManyLoginFails Code = 20004
 
 	// 錢包相關 3xxxx
 	ErrWalletNotFound Code = 30001
@@ -27,8 +29,10 @@ var messages = map[Code]string{
 	ErrInvalidParams: "參數錯誤",
 	ErrUnauthorized:  "未登入或登入已過期",
 	ErrNotFound:      "資源不存在",
-	ErrUserNotFound:  "使用者不存在",
-	ErrUserExists:    "使用者已存在",
+	ErrUserNotFound:      "使用者不存在",
+	ErrUserExists:        "使用者已存在",
+	ErrWrongCredentials:  "帳號或密碼錯誤",
+	ErrTooManyLoginFails: "登入失敗次數過多，請稍後再試",
 
 	ErrWalletNotFound: "錢包不存在",
 }

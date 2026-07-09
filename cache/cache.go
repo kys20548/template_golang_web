@@ -16,6 +16,8 @@ type Cache interface {
 	Get(ctx context.Context, key string) (string, error)
 	Set(ctx context.Context, key string, value string, ttl time.Duration) error
 	Del(ctx context.Context, keys ...string) error
+	// Incr 將 key 的整數值 +1 並回傳新值，第一次建立時設定 ttl。
+	Incr(ctx context.Context, key string, ttl time.Duration) (int64, error)
 }
 
 // RedisCache 為 Cache 的 Redis 實作。
@@ -49,4 +51,17 @@ func (c *RedisCache) Set(ctx context.Context, key string, value string, ttl time
 
 func (c *RedisCache) Del(ctx context.Context, keys ...string) error {
 	return c.client.Del(ctx, keys...).Err()
+}
+
+func (c *RedisCache) Incr(ctx context.Context, key string, ttl time.Duration) (int64, error) {
+	val, err := c.client.Incr(ctx, key).Result()
+	if err != nil {
+		return 0, err
+	}
+	if val == 1 {
+		if err := c.client.Expire(ctx, key, ttl).Err(); err != nil {
+			return val, err
+		}
+	}
+	return val, nil
 }

@@ -13,6 +13,7 @@ type Config struct {
 	DBSource          string        `mapstructure:"DB_SOURCE"`
 	HTTPServerAddress string        `mapstructure:"HTTP_SERVER_ADDRESS"`
 	RedisAddress      string        `mapstructure:"REDIS_ADDRESS"`
+	CORSAllowOrigins  string        `mapstructure:"CORS_ALLOW_ORIGINS"`
 	TokenDuration     time.Duration `mapstructure:"TOKEN_DURATION"`
 	ShutdownTimeout   time.Duration `mapstructure:"SHUTDOWN_TIMEOUT"`
 }

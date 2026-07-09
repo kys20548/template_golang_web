@@ -34,7 +34,7 @@ func (server *Server) setupRouter() {
 
 	// 不用 gin.Default()：以 zerolog middleware 取代 gin 內建 logger
 	router := gin.New()
-	router.Use(httpLogger(), gin.Recovery())
+	router.Use(httpLogger(), corsMiddleware(server.config), gin.Recovery())
 
 	// 公開路由
 	router.GET("/healthz", server.healthCheck)
@@ -43,6 +43,7 @@ func (server *Server) setupRouter() {
 
 	// 需要驗證的路由：header 帶 token，經 authMiddleware 驗證後才會進到 handler
 	authRoutes := router.Group("/").Use(authMiddleware(server.cache))
+	authRoutes.POST("/logout", server.logout)
 	authRoutes.GET("/me", server.me)
 	authRoutes.GET("/wallet", server.getMyWallet)
 	authRoutes.GET("/users/:id", server.getUser)

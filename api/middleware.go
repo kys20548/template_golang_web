@@ -3,11 +3,14 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/kys20548/template_golang_web/cache"
 	"github.com/kys20548/template_golang_web/errcode"
+	"github.com/kys20548/template_golang_web/util"
 	"github.com/rs/zerolog/log"
 )
 
@@ -65,6 +68,19 @@ func authMiddleware(cacheStore cache.Cache) gin.HandlerFunc {
 // getAuthUser 從 context 取出驗證層放入的登入者資訊。
 func getAuthUser(ctx *gin.Context) AuthUser {
 	return ctx.MustGet(authUserKey).(AuthUser)
+}
+
+// corsMiddleware 依設定允許跨域請求；CORS_ALLOW_ORIGINS 為 * 時允許所有來源，
+// 否則為逗號分隔的來源清單。
+func corsMiddleware(config util.Config) gin.HandlerFunc {
+	corsCfg := cors.DefaultConfig()
+	if config.CORSAllowOrigins == "*" {
+		corsCfg.AllowAllOrigins = true
+	} else {
+		corsCfg.AllowOrigins = strings.Split(config.CORSAllowOrigins, ",")
+	}
+	corsCfg.AllowHeaders = append(corsCfg.AllowHeaders, tokenHeaderKey)
+	return cors.New(corsCfg)
 }
 
 // httpLogger 以 zerolog 記錄每一筆 HTTP 請求。

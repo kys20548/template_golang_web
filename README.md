@@ -37,10 +37,19 @@ err 只進 log 不回傳給 client。
 token 存在 Redis（key: `session:<token>`）後，把 `AuthUser` 放進 gin context，
 handler 用 `getAuthUser(ctx)` 取得登入者資訊。
 
+登入安全：密碼以 bcrypt 儲存；帳號不存在與密碼錯誤回同一個錯誤碼（20003）；
+連續失敗 5 次鎖定 15 分鐘（Redis 計數器）；`POST /logout` 刪除 session 即時登出。
+user 回應一律走 `userResponse`，不會帶出 hashed_password。
+
 ```bash
-TOKEN=$(curl -s -X POST localhost:8080/login -d '{"username":"danny"}' | jq -r .data.token)
+TOKEN=$(curl -s -X POST localhost:8080/login -d '{"username":"danny","password":"secret123"}' | jq -r .data.token)
 curl -H "token: $TOKEN" localhost:8080/me
 ```
+
+## CORS
+
+`app.env` 的 `CORS_ALLOW_ORIGINS` 控制允許的跨域來源：`*` 允許全部（開發用），
+production 改成逗號分隔清單，例如 `https://admin.example.com,https://app.example.com`。
 
 ## Graceful Shutdown
 
@@ -69,8 +78,8 @@ make server        # 啟動 server（0.0.0.0:8080）
 ```bash
 # 公開路由
 curl http://localhost:8080/healthz
-curl -X POST http://localhost:8080/users -d '{"username":"danny","email":"danny@example.com"}'
-curl -X POST http://localhost:8080/login -d '{"username":"danny"}'
+curl -X POST http://localhost:8080/users -d '{"username":"danny","email":"danny@example.com","password":"secret123"}'
+curl -X POST http://localhost:8080/login -d '{"username":"danny","password":"secret123"}'
 
 # 需驗證的路由（header 帶 token）
 curl -H "token: <token>" http://localhost:8080/me

@@ -18,6 +18,7 @@ type Response struct {
 type PageResult struct {
 	PageNum  int32 `json:"pageNum"`
 	PageSize int32 `json:"pageSize"`
+	Total    int64 `json:"total"`
 	List     any   `json:"list"`
 }
 
