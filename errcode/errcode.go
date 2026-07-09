@@ -12,6 +12,7 @@ const (
 	ErrInvalidParams Code = 10002
 	ErrUnauthorized  Code = 10003
 	ErrNotFound      Code = 10004
+	ErrTimeout       Code = 10005
 
 	// 使用者相關 2xxxx
 	ErrUserNotFound      Code = 20001
@@ -29,6 +30,7 @@ var messages = map[Code]string{
 	ErrInvalidParams: "參數錯誤",
 	ErrUnauthorized:  "未登入或登入已過期",
 	ErrNotFound:      "資源不存在",
+	ErrTimeout:       "請求處理逾時",
 	ErrUserNotFound:      "使用者不存在",
 	ErrUserExists:        "使用者已存在",
 	ErrWrongCredentials:  "帳號或密碼錯誤",

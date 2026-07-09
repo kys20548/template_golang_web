@@ -54,7 +54,7 @@ func (server *Server) createUser(ctx *gin.Context) {
 
 	hashedPassword, err := util.HashPassword(req.Password)
 	if err != nil {
-		fail(ctx, http.StatusInternalServerError, errcode.ErrInternal, err)
+		failInternal(ctx, err)
 		return
 	}
 
@@ -74,7 +74,7 @@ func (server *Server) createUser(ctx *gin.Context) {
 			fail(ctx, http.StatusConflict, errcode.ErrUserExists, nil)
 			return
 		}
-		fail(ctx, http.StatusInternalServerError, errcode.ErrInternal, err)
+		failInternal(ctx, err)
 		return
 	}
 
@@ -101,7 +101,7 @@ func (server *Server) getUser(ctx *gin.Context) {
 			fail(ctx, http.StatusNotFound, errcode.ErrUserNotFound, nil)
 			return
 		}
-		fail(ctx, http.StatusInternalServerError, errcode.ErrInternal, err)
+		failInternal(ctx, err)
 		return
 	}
 
@@ -127,13 +127,13 @@ func (server *Server) listUsers(ctx *gin.Context) {
 
 	users, err := server.store.ListUsers(ctx, arg)
 	if err != nil {
-		fail(ctx, http.StatusInternalServerError, errcode.ErrInternal, err)
+		failInternal(ctx, err)
 		return
 	}
 
 	total, err := server.store.CountUsers(ctx)
 	if err != nil {
-		fail(ctx, http.StatusInternalServerError, errcode.ErrInternal, err)
+		failInternal(ctx, err)
 		return
 	}
 

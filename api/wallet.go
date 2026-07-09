@@ -20,7 +20,7 @@ func (server *Server) getMyWallet(ctx *gin.Context) {
 			fail(ctx, http.StatusNotFound, errcode.ErrWalletNotFound, nil)
 			return
 		}
-		fail(ctx, http.StatusInternalServerError, errcode.ErrInternal, err)
+		failInternal(ctx, err)
 		return
 	}
 

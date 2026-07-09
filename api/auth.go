@@ -48,7 +48,7 @@ func (server *Server) login(ctx *gin.Context) {
 	// 失敗次數達上限則鎖定
 	failCount, err := server.getLoginFailCount(ctx, req.Username)
 	if err != nil {
-		fail(ctx, http.StatusInternalServerError, errcode.ErrInternal, err)
+		failInternal(ctx, err)
 		return
 	}
 	if failCount >= maxLoginAttempts {
@@ -63,7 +63,7 @@ func (server *Server) login(ctx *gin.Context) {
 			fail(ctx, http.StatusUnauthorized, errcode.ErrWrongCredentials, nil)
 			return
 		}
-		fail(ctx, http.StatusInternalServerError, errcode.ErrInternal, err)
+		failInternal(ctx, err)
 		return
 	}
 
@@ -86,13 +86,13 @@ func (server *Server) login(ctx *gin.Context) {
 	}
 	payload, err := json.Marshal(authUser)
 	if err != nil {
-		fail(ctx, http.StatusInternalServerError, errcode.ErrInternal, err)
+		failInternal(ctx, err)
 		return
 	}
 
 	err = server.cache.Set(ctx, sessionKey(token), string(payload), server.config.TokenDuration)
 	if err != nil {
-		fail(ctx, http.StatusInternalServerError, errcode.ErrInternal, err)
+		failInternal(ctx, err)
 		return
 	}
 
@@ -104,7 +104,7 @@ func (server *Server) login(ctx *gin.Context) {
 func (server *Server) logout(ctx *gin.Context) {
 	token := ctx.GetHeader(tokenHeaderKey)
 	if err := server.cache.Del(ctx, sessionKey(token)); err != nil {
-		fail(ctx, http.StatusInternalServerError, errcode.ErrInternal, err)
+		failInternal(ctx, err)
 		return
 	}
 	ok(ctx, nil)

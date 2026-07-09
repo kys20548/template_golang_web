@@ -61,6 +61,21 @@ client 一律收到統一的 `{"code":10001,"msg":"系統內部錯誤","data":nu
 server 端的 stack trace 依環境輸出：development 用 gin 內建的多行可讀格式，
 production 由 zerolog 記成單行 JSON（含 request_id）給 log 收集器。
 
+## API 超時控制
+
+兩層設計：
+
+- **硬超時**：全域 `API_TIMEOUT`（預設 10s），`timeoutMiddleware` 把 deadline
+  掛在 request context 上，超時會真正取消進行中的 DB / Redis 操作，
+  client 收到 `504 + {"code":10005,"msg":"請求處理逾時"}`。
+  個別路由可再掛更短的 `timeoutMiddleware(2*time.Second)`，巢狀 context 誰短誰先到期。
+- **慢請求 log**：個別路由掛 `slowLogMiddleware(2*time.Second)`，
+  超過門檻只印 WARN `slow request`（含 request_id）方便排查，不中斷請求。
+
+注意：deadline 能傳進 sqlc / go-redis 是靠 `router.ContextWithFallback = true`
+（gin 預設 `ctx.Done()` 回空值），不要移除這行。
+handler 的預設錯誤分支統一走 `failInternal(ctx, err)`，超時自動轉 504。
+
 ## DB 連線池
 
 `sql.DB` 預設開啟連線數無上限，尖峰時會把 DB 塞爆。`app.env` 提供：

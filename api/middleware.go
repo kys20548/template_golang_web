@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -103,6 +104,40 @@ func requestIDMiddleware() gin.HandlerFunc {
 // handler 內記 log 一律用它，不要直接用全域的 log。
 func getLogger(ctx *gin.Context) *zerolog.Logger {
 	return log.Ctx(ctx.Request.Context())
+}
+
+// timeoutMiddleware 把 deadline 掛在 request context 上，超時會取消
+// 進行中的 DB / Redis 操作，handler 收到 context.DeadlineExceeded 後
+// 經 failInternal 回 504。全域掛 API_TIMEOUT；個別路由可再掛更短的，
+// 巢狀 context 誰短誰先到期。
+// 注意：需搭配 router.ContextWithFallback = true 才能讓 deadline
+// 傳進直接收 *gin.Context 的 sqlc / go-redis 呼叫。
+func timeoutMiddleware(d time.Duration) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		c, cancel := context.WithTimeout(ctx.Request.Context(), d)
+		defer cancel()
+
+		ctx.Request = ctx.Request.WithContext(c)
+		ctx.Next()
+	}
+}
+
+// slowLogMiddleware 個別路由的慢請求門檻：超過 threshold 只印 WARN log
+// 方便排查，不中斷請求（硬超時由全域 timeoutMiddleware 負責）。
+func slowLogMiddleware(threshold time.Duration) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		start := time.Now()
+		ctx.Next()
+
+		if duration := time.Since(start); duration > threshold {
+			getLogger(ctx).Warn().
+				Str("method", ctx.Request.Method).
+				Str("path", ctx.Request.URL.Path).
+				Dur("duration", duration).
+				Dur("threshold", threshold).
+				Msg("slow request")
+		}
+	}
 }
 
 // recoveryHandler 統一 panic 回應：gin.Recovery 只會回空 body 的 500，

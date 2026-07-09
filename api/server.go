@@ -2,6 +2,7 @@ package api
 
 import (
 	"io"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kys20548/template_golang_web/cache"
@@ -44,9 +45,16 @@ func (server *Server) setupRouter() {
 	}
 
 	router := gin.New()
+
+	// gin 預設 ctx.Done()/Deadline() 回空值，開 fallback 才會委派給
+	// Request.Context()，timeoutMiddleware 的 deadline 才能傳進
+	// 直接收 *gin.Context 的 sqlc / go-redis 呼叫
+	router.ContextWithFallback = true
+
 	router.Use(
 		requestIDMiddleware(),
 		httpLogger(),
+		timeoutMiddleware(server.config.APITimeout),
 		corsMiddleware(server.config),
 		gin.CustomRecoveryWithWriter(recoveryWriter, recoveryHandler),
 	)
@@ -62,7 +70,8 @@ func (server *Server) setupRouter() {
 	authRoutes.GET("/me", server.me)
 	authRoutes.GET("/wallet", server.getMyWallet)
 	authRoutes.GET("/users/:id", server.getUser)
-	authRoutes.GET("/users", server.listUsers)
+	// 個別路由範例：超過 2s 印 slow request WARN log（不中斷請求）
+	authRoutes.GET("/users", slowLogMiddleware(2000*time.Millisecond), server.listUsers)
 
 	server.router = router
 }

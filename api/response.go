@@ -1,6 +1,8 @@
 package api
 
 import (
+	"context"
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -42,6 +44,16 @@ func fail(ctx *gin.Context, httpStatus int, code errcode.Code, err error) {
 		Msg:  code.Msg(),
 		Data: nil,
 	})
+}
+
+// failInternal 為 handler 預設錯誤分支的統一出口：
+// 全域 API_TIMEOUT 到期導致的錯誤回 504 + ErrTimeout，其餘回 500 + ErrInternal。
+func failInternal(ctx *gin.Context, err error) {
+	if errors.Is(err, context.DeadlineExceeded) {
+		fail(ctx, http.StatusGatewayTimeout, errcode.ErrTimeout, err)
+		return
+	}
+	fail(ctx, http.StatusInternalServerError, errcode.ErrInternal, err)
 }
 
 // failAbort 同 fail，但中斷後續 middleware / handler，供驗證層使用。
