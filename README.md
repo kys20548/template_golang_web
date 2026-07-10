@@ -98,6 +98,84 @@ http://localhost:8080/swagger/index.html
 （gin 預設 `ctx.Done()` 回空值），不要移除這行。
 handler 的預設錯誤分支統一走 `failInternal(ctx, err)`，超時自動轉 504。
 
+## 核心觀念筆記
+
+### Middleware 順序（洋蔥模型）
+
+middleware 的順序就是 `router.Use(...)` 裡寫的順序，結構是洋蔥：
+`ctx.Next()` **之前**的程式碼在「進去」的路上跑，`ctx.Next()` **之後**的
+程式碼在「出來」的路上跑，出來的順序與進去相反。
+
+```
+進去 →  requestID → httpLogger → timeout → cors → recovery → audit → handler
+                                                                        │
+出來 ←  requestID ← httpLogger ← timeout ← cors ← recovery ← audit ←────┘
+```
+
+| middleware | 進去時（Next 前） | 出來時（Next 後） |
+|---|---|---|
+| requestID | 產 id、掛 request-scoped logger | — |
+| httpLogger | 記開始時間 | 印 access log（所以量得到 duration、status） |
+| audit | 先讀走 request body | 寫 operation_logs（此時才有 status code 與登入者） |
+
+順序是有講究的：httpLogger 要放外層才能把整條鏈的耗時都包住；
+audit 要等 handler 做完才知道結果，所以工作放在 Next 之後。
+新增 middleware 時要想：它的工作是進去做還是出來做、需要包住誰。
+
+### Go context 觀念整理
+
+有兩個完全不同的東西撞名叫 Context：
+
+- **`context.Context`（Go 標準）**：4 個方法的小 interface（到期了沒、取消了沒、
+  帶什麼值），是超時取消機制的本體。**不可變，沒有「設定」這個動作**，
+  唯一的操作是「包一層生出新節點」，全 app 形成一棵樹。
+- **`*gin.Context`（gin 的請求工具箱）**：gin 每個請求建一個的大結構體
+  （Request、Writer、Params、`ctx.Set` 的置物格…）。`ctx.Next()` 是
+  middleware 流程控制（換下一棒），跟標準 context 概念無關。
+
+整棵樹長這樣，**工具箱不在樹上，是站在樹旁邊用 Request 指著某個節點**：
+
+```
+        context.Background()           ← 全 app 唯一的根（單例，到處呼叫拿到同一個）
+         ├── pingCtx (5s)              ← main：啟動檢查 DB/Redis
+         ├── shutdownCtx (10s)         ← listenSignal：優雅關閉
+         └── 請求 A 的 context          ← net/http 幫每個請求長的（不是 gin）
+               │
+               +10s deadline           ←─────┐ timeoutMiddleware 長節點後把手指移過來
+                  │        │                 │
+           (+2s deadline)  WithoutCancel     │ 指著
+                                             │
+        ┌────────────────────────────────────┴──┐
+        │ gin.Context（工具箱，站在樹外）           │
+        │   Request ──其中的 Context 就是指標──────┘
+        │   Writer / Params / Keys(置物格)
+        └───────────────────────────────────────┘
+```
+
+規則整理：
+
+- `WithTimeout(parent, d)` 長在**你給的 parent** 下面，不一定是第一層；
+  巢狀 deadline 誰短誰先到期（個別路由 2s 疊在全域 10s 下就是這麼來的）
+- 父節點取消/到期，子孫全部跟著取消；請求結束整條分支被回收，
+  50 個並發請求就是 50 條互不相干的分支
+- 取消是「合作式」：sqlc / go-redis 拿到 ctx 後邊做事邊監聽 `ctx.Done()`，
+  到期就自己放棄，沒有人能從外部強制殺 goroutine
+- `context.WithoutCancel(parent)`：值照樣繼承（request_id 還在），但父層的
+  取消訊號傳不到它——audit 用它確保「請求超時被砍」這種最該稽核的紀錄寫得進去
+- **`router.ContextWithFallback = true` 不能移除**：handler 把工具箱直接傳給
+  sqlc 時，工具箱被問「到期了沒」預設裝死回「沒有時限」；開了 fallback
+  它才會轉頭去問肚子裡的 `Request.Context()`，deadline 才真的生效。
+  等價寫法是每個呼叫點改傳 `ctx.Request.Context()`，但容易漏寫
+
+常見程式碼對照：
+
+| 程式碼 | 屬於 | 做什麼 |
+|---|---|---|
+| `ctx.Next()` / `ctx.Set` / `ctx.Get` | gin 工具箱 | 流程控制 / 置物格 |
+| `ctx.Request.Context()` | 標準 | 取出手指指著的樹上節點 |
+| `context.Background()` | 標準 | 樹根（單例） |
+| `context.WithTimeout` / `WithoutCancel` | 標準 | 在樹上包一層長新節點 |
+
 ## DB 連線池
 
 `sql.DB` 預設開啟連線數無上限，尖峰時會把 DB 塞爆。`app.env` 提供：
