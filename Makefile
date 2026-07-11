@@ -19,6 +19,12 @@ migratedown:
 sqlc:
 	sqlc generate
 
+# 從 Store / Cache interface 產生 mock 實作，供 handler 測試用。
+# 用法：mockgen -package <生成碼的 package 名> -destination <輸出檔> <interface 所在的 import path> <interface 名>
+mock:
+	$(GOBIN)/mockgen -package mockdb -destination db/mock/store.go github.com/kys20548/template_golang_web/db/sqlc Store
+	$(GOBIN)/mockgen -package mockcache -destination cache/mock/cache.go github.com/kys20548/template_golang_web/cache Cache
+
 swagger:
 	$(GOBIN)/swag init --parseDependency --parseInternal
 
@@ -28,4 +34,4 @@ server:
 test:
 	go test -v -cover ./...
 
-.PHONY: postgres createdb dropdb migrateup migratedown sqlc swagger server test
+.PHONY: postgres createdb dropdb migrateup migratedown sqlc mock swagger server test

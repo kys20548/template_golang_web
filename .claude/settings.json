@@ -1,17 +1,5 @@
 {
   "hooks": {
-    // "PreToolUse": [
-    //   {
-    //     "matcher": "Edit|Write",
-    //     "hooks": [
-    //       {
-    //         "type": "command",
-    //         "command": "f=$(jq -r '.tool_input.file_path // \"\"'); case \"$f\" in */db/sqlc/*|*/docs/*) echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"生成碼禁止手改：db/sqlc 請改 db/query/*.sql 後執行 make sqlc；docs 請改 handler 註解後執行 make swagger\"}}';; esac",
-    //         "statusMessage": "檢查是否為生成碼"
-    //       }
-    //     ]
-    //   }
-    // ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write",
