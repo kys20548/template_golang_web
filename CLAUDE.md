@@ -14,6 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 make postgres      # 啟動 PostgreSQL + Redis（docker compose）
 make migrateup     # 執行 migration（migrate CLI 在 /usr/local/bin/migrate）
 make sqlc          # 重新生成 db/sqlc/（sqlc 用 brew 裝的，go install 在 macOS 會編譯失敗）
+make mock          # 重新生成 db/mock/ 與 cache/mock/（mockgen 在 $(go env GOPATH)/bin）
 make swagger       # 重新生成 docs/（swag 在 $(go env GOPATH)/bin）
 make server        # 啟動 server（0.0.0.0:8080）
 make test          # go test -v -cover ./...
@@ -25,6 +26,7 @@ DB 直接查詢：`docker exec template_golang_web_db psql -U root -d template_g
 ## 生成碼（絕對不要手改）
 
 - `db/sqlc/` — 改 `db/query/*.sql` 後 `make sqlc`
+- `db/mock/`、`cache/mock/` — Store / Cache interface 變動後 `make mock`
 - `docs/` — 改 handler 的 Swagger 註解後 `make swagger`
 
 有 PreToolUse hook 會擋這兩個目錄的編輯。
@@ -50,11 +52,12 @@ flat layout（仿 simple_bank）：`main.go` 在根目錄做依賴注入，`api/
 7. **每支 handler 要有 Swagger 註解**（@Summary/@Tags/@Success/@Router，需登入的加 @Security TokenAuth），改完 `make swagger`。
 8. `server.go` 的 `router.ContextWithFallback = true` **不能移除**，否則 API 超時的 deadline 傳不進 sqlc/go-redis（原理見 README）。
 9. migration 檔名 `00000N_name.up.sql` / `.down.sql` 成對遞增，改完 `make migrateup` 驗證。
+10. **新增 API 要補 handler 測試**：table-driven，用 `db/mock` + `cache/mock`，共用 helper 在 `api/main_test.go`（`newTestServer` / `setupAuth` / `parseResponse`）；POST/PUT/DELETE 要多排一筆 `CreateOperationLog` 劇本（audit middleware 會呼叫）；含 bcrypt 雜湊的參數用自訂 matcher 比對（見 `eqCreateUserTxParams`）。要點詳見 README「測試」。
 
 ## 新增一支 API 的流程
 
-`db/query/*.sql` 寫 SQL → `make sqlc` → handler（統一回應 + Swagger 註解 + failInternal）→ `server.go` 掛路由（決定要不要 auth / slowLog / 更短 timeout）→ `make swagger` → `go build ./... && go vet ./...` → 起 server curl 實測 → 更新 README。
+`db/query/*.sql` 寫 SQL → `make sqlc` → handler（統一回應 + Swagger 註解 + failInternal）→ `server.go` 掛路由（決定要不要 auth / slowLog / 更短 timeout）→ `make swagger` → handler 測試（慣例 10）→ `go build ./... && go vet ./... && make test` → 起 server curl 實測 → 更新 README。
 
 ## Roadmap
 
-未實作項目見 README「Roadmap（尚未實作）」：RBAC（開工前先對齊使用者既有 Java 系統的權限表結構）、mockgen 測試、Dockerfile + CI、排程、asynq/kafka。
+未實作項目見 README「Roadmap（尚未實作）」：RBAC（開工前先對齊使用者既有 Java 系統的權限表結構）、Dockerfile + CI、排程、asynq/kafka。
