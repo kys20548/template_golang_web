@@ -20,6 +20,9 @@ type Config struct {
 	TokenDuration     time.Duration `mapstructure:"TOKEN_DURATION"`
 	ShutdownTimeout   time.Duration `mapstructure:"SHUTDOWN_TIMEOUT"`
 	APITimeout        time.Duration `mapstructure:"API_TIMEOUT"`
+
+	OperationLogCleanupCron     string `mapstructure:"OPERATION_LOG_CLEANUP_CRON"`
+	OperationLogRetentionMonths int    `mapstructure:"OPERATION_LOG_RETENTION_MONTHS"`
 }
 
 // LoadConfig 從指定路徑讀取 app.env，環境變數可覆蓋設定檔的值。

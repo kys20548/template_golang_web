@@ -33,9 +33,11 @@ DB 直接查詢：`docker exec template_golang_web_db psql -U root -d template_g
 
 ## 架構
 
-flat layout（仿 simple_bank）：`main.go` 在根目錄做依賴注入，`api/`（handler、middleware、路由）、`db/`（migration、query、sqlc 生成碼 + Store interface）、`cache/`（Cache interface + Redis 實作）、`errcode/`（業務狀態碼）、`util/`（config、password）。
+flat layout（仿 simple_bank）：`main.go` 在根目錄做依賴注入，`api/`（handler、middleware、路由）、`db/`（migration、query、sqlc 生成碼 + Store interface）、`cache/`（Cache interface + Redis 實作）、`errcode/`（業務狀態碼）、`scheduler/`（asynq 排程 + worker）、`util/`（config、password）。
 
-**啟動與關閉**：main 先 Ping DB 和 Redis（失敗就 `log.Fatal`，不啟動 HTTP server——`sql.Open` 是惰性的所以必須顯式 Ping）；gin engine 掛在 `http.Server` 上，SIGINT/SIGTERM 觸發 `server.Shutdown`（timeout 由 `SHUTDOWN_TIMEOUT` 控制）。
+**啟動與關閉**：main 先 Ping DB 和 Redis（失敗就 `log.Fatal`，不啟動 HTTP server——`sql.Open` 是惰性的所以必須顯式 Ping）；gin engine 掛在 `http.Server` 上，SIGINT/SIGTERM 觸發 `server.Shutdown`（timeout 由 `SHUTDOWN_TIMEOUT` 控制），之後再關 scheduler。
+
+**排程與背景任務**：`scheduler/` 用 asynq——scheduler 到點 enqueue、worker 執行（cron 用本地時區）。新任務：開 `task_xxx.go` 定義 `periodicTask`（cron、enqueue opts、handler）＋在 `periodicTasks()` 加一行；要不要 `asynq.Unique` 去重、TTL 多長是**每個任務自己的選項**，不是全域規則。測試用 `OPERATION_LOG_CLEANUP_CRON="* * * * *"` 之類的環境變數覆蓋 cron 實測。詳見 README「排程任務與背景任務（asynq）」。
 
 **失敗哲學**：runtime 元件各自獨立失敗——背景元件掛掉只記 log，絕不拖垮 HTTP server（不用 errgroup 做生命週期耦合）；啟動期則是 fail-fast。
 

@@ -12,6 +12,7 @@ package mockdb
 import (
 	context "context"
 	reflect "reflect"
+	time "time"
 
 	db "github.com/kys20548/template_golang_web/db/sqlc"
 	gomock "go.uber.org/mock/gomock"
@@ -129,6 +130,21 @@ func (m *MockStore) CreateWallet(ctx context.Context, userID int64) (db.Wallet, 
 func (mr *MockStoreMockRecorder) CreateWallet(ctx, userID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateWallet", reflect.TypeOf((*MockStore)(nil).CreateWallet), ctx, userID)
+}
+
+// DeleteOperationLogsBefore mocks base method.
+func (m *MockStore) DeleteOperationLogsBefore(ctx context.Context, createdAt time.Time) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteOperationLogsBefore", ctx, createdAt)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteOperationLogsBefore indicates an expected call of DeleteOperationLogsBefore.
+func (mr *MockStoreMockRecorder) DeleteOperationLogsBefore(ctx, createdAt any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteOperationLogsBefore", reflect.TypeOf((*MockStore)(nil).DeleteOperationLogsBefore), ctx, createdAt)
 }
 
 // DeleteUser mocks base method.

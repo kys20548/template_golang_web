@@ -8,6 +8,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"time"
 )
 
 const countOperationLogs = `-- name: CountOperationLogs :one
@@ -62,6 +63,19 @@ func (q *Queries) CreateOperationLog(ctx context.Context, arg CreateOperationLog
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const deleteOperationLogsBefore = `-- name: DeleteOperationLogsBefore :execrows
+DELETE FROM operation_logs
+WHERE created_at < $1
+`
+
+func (q *Queries) DeleteOperationLogsBefore(ctx context.Context, createdAt time.Time) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteOperationLogsBefore, createdAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const listOperationLogs = `-- name: ListOperationLogs :many

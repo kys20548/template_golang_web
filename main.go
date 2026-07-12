@@ -14,6 +14,7 @@ import (
 	"github.com/kys20548/template_golang_web/cache"
 	db "github.com/kys20548/template_golang_web/db/sqlc"
 	_ "github.com/kys20548/template_golang_web/docs"
+	"github.com/kys20548/template_golang_web/scheduler"
 	"github.com/kys20548/template_golang_web/util"
 	_ "github.com/lib/pq"
 	"github.com/rs/zerolog"
@@ -76,6 +77,13 @@ func main() {
 		log.Fatal().Err(err).Msg("cannot create server")
 	}
 
+	// 排程與背景任務（asynq）：啟動期 fail-fast——
+	// 起不來就不啟動 HTTP server，不允許服務帶著缺功能上線
+	sched := scheduler.New(config, store)
+	if err := sched.Start(); err != nil {
+		log.Fatal().Err(err).Msg("cannot start scheduler")
+	}
+
 	httpServer := &http.Server{
 		Addr:    config.HTTPServerAddress,
 		Handler: server.Router(),
@@ -90,12 +98,12 @@ func main() {
 		}
 	}()
 
-	listenSignal(httpServer, config)
+	listenSignal(httpServer, sched, config)
 }
 
 // listenSignal 阻塞等待 SIGINT / SIGTERM，收到訊號後優雅關閉 server：
 // 停止接收新連線，並在 timeout 內等待進行中的請求處理完成。
-func listenSignal(server *http.Server, config util.Config) {
+func listenSignal(server *http.Server, sched *scheduler.Scheduler, config util.Config) {
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 	<-ch // 阻塞，直到收到訊號
@@ -110,4 +118,6 @@ func listenSignal(server *http.Server, config util.Config) {
 	}
 
 	log.Info().Msg("http server 已安全終止")
+
+	sched.Shutdown()
 }

@@ -13,3 +13,7 @@ OFFSET $2;
 
 -- name: CountOperationLogs :one
 SELECT count(*) FROM operation_logs;
+
+-- name: DeleteOperationLogsBefore :execrows
+DELETE FROM operation_logs
+WHERE created_at < $1;

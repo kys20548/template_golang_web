@@ -6,6 +6,7 @@ package db
 
 import (
 	"context"
+	"time"
 )
 
 type Querier interface {
@@ -14,6 +15,7 @@ type Querier interface {
 	CreateOperationLog(ctx context.Context, arg CreateOperationLogParams) (OperationLog, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateWallet(ctx context.Context, userID int64) (Wallet, error)
+	DeleteOperationLogsBefore(ctx context.Context, createdAt time.Time) (int64, error)
 	DeleteUser(ctx context.Context, id int64) error
 	GetUser(ctx context.Context, id int64) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
