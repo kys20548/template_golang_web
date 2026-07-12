@@ -4,3 +4,7 @@
 *.out
 main
 template_golang_web
+
+# Claude Code 本地設定，不上傳
+CLAUDE.md
+.claude/
