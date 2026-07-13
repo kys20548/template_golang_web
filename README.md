@@ -82,7 +82,14 @@ curl -H "token: <token>" 'http://localhost:8080/users?pageNum=1&pageSize=5'
 
 - [ ] **RBAC 權限控制** — roles / permissions / user_roles 表 + `permMiddleware("user:delete")`
       權限中介層；權限清單登入時放進 Redis session。開工前先對齊既有 Java 系統的權限表結構
+- [x] **`/readyz` readiness 端點** — ping DB/Redis，給 LB / ASG(ELB health check) /
+      k8s readiness probe 判斷「這台能不能收流量」；依賴掛了是摘流量等恢復，不是自殺重啟
+- [ ] **Session 補完** — sliding TTL（活躍使用者自動續期，不會用到一半被登出）+
+      per-user session 反查（改密碼 / 停用帳號時踢掉該使用者所有 token）
 - [ ] **kafka** — 有實際場景再加；原則：獨立 goroutine 執行、
       掛掉只記 log 不拖垮 HTTP server，graceful shutdown 時一併優雅關閉
+
+明確不做（模板定位是 code，運維交給部署方）：log 收集/alerting、secrets 管理、
+`/metrics`、壓測、SQL migration 的部署編排。
 
 已完成項目的演進紀錄與設計細節見 [NOTES.md](NOTES.md)。

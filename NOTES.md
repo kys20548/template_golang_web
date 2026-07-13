@@ -204,6 +204,27 @@ audit 要等 handler 做完才知道結果，所以工作放在 Next 之後。
 `app.env` 的 `CORS_ALLOW_ORIGINS` 控制允許的跨域來源：`*` 允許全部（開發用），
 production 改成逗號分隔清單，例如 `https://admin.example.com,https://app.example.com`。
 
+## 健康檢查（liveness / readiness）
+
+兩個端點，語意不同：
+
+- **`/healthz`（liveness）**：進程活著就回 200，不看依賴。給「要不要重啟這個進程」用。
+- **`/readyz`（readiness）**：ping DB 與 Redis，都通才回 200，否則 `503 + 10006 服務未就緒`。
+  給 LB / ASG（health check type 設 ELB，target group 指到這裡）/ k8s readiness probe
+  判斷「這台能不能收流量」。
+
+為什麼依賴掛了是回 503 而不是讓進程自己退出：DB 抖動 30 秒，全部 instance
+同時自殺 → ASG 慢慢補機器 → 新機器起來 DB 還沒好又死，一次抖動放大成全面停機。
+正確行為是 instance 活著但宣告未就緒，LB 摘掉流量，依賴恢復後自動回歸（實測過：
+`docker pause` Redis 後 /readyz 回 503，unpause 後不用重啟就恢復 200）。
+
+/readyz 掛了更短的 `timeoutMiddleware(2s)`：探針要快進快出，DB 連不上時
+2 秒內就回 503，不佔著探針等全域的 10s。
+
+注意與啟動檢查的分工：啟動期依賴連不上是 fail-fast（`log.Fatal` 不起服務），
+runtime 依賴抖動是 readiness 摘流量等恢復——一個是「不要帶病上線」，
+一個是「上線後生病不要自殺」。
+
 ## Graceful Shutdown
 
 main goroutine 阻塞等待 `SIGINT` / `SIGTERM`，收到訊號後呼叫
@@ -215,8 +236,9 @@ main goroutine 阻塞等待 `SIGINT` / `SIGTERM`，收到訊號後呼叫
 **Dockerfile**（multi-stage）：builder 層用完整 Go 工具鏈編譯靜態執行檔，
 最終 image 只有 alpine + 執行檔 + app.env（約 70MB）。兩個細節：
 
-- 有裝 `tzdata` 並預設 `TZ=Asia/Taipei`——scheduler 的 cron 以本地時區解讀，
-  沒有 tzdata 的話容器內 `time.Local` 會退回 UTC，「凌晨」就變下午了
+- 有裝 `tzdata`，但 **image 不自己設 TZ**——時區以部署環境注入的 `TZ` 環境變數為準
+  （一般原則：跟部署機器走，程式不要自作主張）。沒注入 TZ 時容器跑 UTC，
+  scheduler 的 cron「凌晨」就是 UTC 半夜，部署時要注意
 - image 內的 `app.env` 只是讓 viper 能啟動的底，實際部署用環境變數覆蓋
 
 migration 不在 image 裡執行，部署時另外跑 `migrate` CLI（或 CI/CD pipeline 的獨立步驟）。

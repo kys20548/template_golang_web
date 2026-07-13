@@ -18,6 +18,8 @@ type Cache interface {
 	Del(ctx context.Context, keys ...string) error
 	// Incr 將 key 的整數值 +1 並回傳新值，第一次建立時設定 ttl。
 	Incr(ctx context.Context, key string, ttl time.Duration) (int64, error)
+	// Ping 檢查連線是否正常，供啟動檢查與 readiness 探針使用。
+	Ping(ctx context.Context) error
 }
 
 // RedisCache 為 Cache 的 Redis 實作。

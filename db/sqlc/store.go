@@ -11,6 +11,8 @@ import (
 type Store interface {
 	Querier
 	CreateUserTx(ctx context.Context, arg CreateUserTxParams) (CreateUserTxResult, error)
+	// Ping 檢查 DB 連線是否正常，供啟動檢查與 readiness 探針使用。
+	Ping(ctx context.Context) error
 }
 
 // SQLStore 為 Store 的實際實作，操作真實的 PostgreSQL。
@@ -24,6 +26,10 @@ func NewStore(db *sql.DB) Store {
 		db:      db,
 		Queries: New(db),
 	}
+}
+
+func (store *SQLStore) Ping(ctx context.Context) error {
+	return store.db.PingContext(ctx)
 }
 
 // execTx 在一個 database transaction 中執行 fn。

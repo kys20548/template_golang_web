@@ -23,7 +23,7 @@ const docTemplate = `{
                 "tags": [
                     "system"
                 ],
-                "summary": "健康檢查",
+                "summary": "健康檢查（liveness）",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -213,6 +213,43 @@ const docTemplate = `{
                                     }
                                 }
                             ]
+                        }
+                    }
+                }
+            }
+        },
+        "/readyz": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system"
+                ],
+                "summary": "Readiness 檢查（含 DB/Redis 連線）",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/api.Response"
                         }
                     }
                 }
@@ -585,6 +622,7 @@ const docTemplate = `{
                 10003,
                 10004,
                 10005,
+                10006,
                 20001,
                 20002,
                 20003,
@@ -598,6 +636,7 @@ const docTemplate = `{
                 "ErrUnauthorized",
                 "ErrNotFound",
                 "ErrTimeout",
+                "ErrNotReady",
                 "ErrUserNotFound",
                 "ErrUserExists",
                 "ErrWrongCredentials",

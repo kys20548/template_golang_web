@@ -13,17 +13,6 @@ import (
 	"github.com/lib/pq"
 )
 
-// healthCheck 健康檢查。
-//
-// @Summary  健康檢查
-// @Tags     system
-// @Produce  json
-// @Success  200 {object} Response{data=string}
-// @Router   /healthz [get]
-func (server *Server) healthCheck(ctx *gin.Context) {
-	ok(ctx, "ok")
-}
-
 // userResponse 為 user 的對外回應結構，排除 hashed_password 等敏感欄位。
 type userResponse struct {
 	ID        int64     `json:"id"`

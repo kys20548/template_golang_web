@@ -14,10 +14,11 @@ RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o main .
 FROM alpine:3.22
 WORKDIR /app
 
-# tzdata：scheduler 的 cron 以本地時區解讀，沒有 tzdata 的話 TZ 設了也沒用（會退回 UTC）
+# tzdata：讓部署環境注入的 TZ 環境變數生效（沒有 tzdata 的話 TZ 設了也沒用）。
+# image 不自己設 TZ——時區是部署環境的決定；沒注入 TZ 時容器跑 UTC，
+# scheduler 的 cron「凌晨」就是 UTC 半夜，部署時要自己想清楚
 # ca-certificates：之後打外部 HTTPS API 會用到
 RUN apk add --no-cache tzdata ca-certificates
-ENV TZ=Asia/Taipei
 
 COPY --from=builder /app/main .
 # viper 要求 app.env 存在才能啟動；實際部署用環境變數覆蓋其中的值

@@ -117,6 +117,7 @@ definitions:
     - 10003
     - 10004
     - 10005
+    - 10006
     - 20001
     - 20002
     - 20003
@@ -130,6 +131,7 @@ definitions:
     - ErrUnauthorized
     - ErrNotFound
     - ErrTimeout
+    - ErrNotReady
     - ErrUserNotFound
     - ErrUserExists
     - ErrWrongCredentials
@@ -156,7 +158,7 @@ paths:
                 data:
                   type: string
               type: object
-      summary: 健康檢查
+      summary: 健康檢查（liveness）
       tags:
       - system
   /login:
@@ -253,6 +255,27 @@ paths:
       security:
       - TokenAuth: []
       summary: 操作日誌列表
+      tags:
+      - system
+  /readyz:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Readiness 檢查（含 DB/Redis 連線）
       tags:
       - system
   /users:

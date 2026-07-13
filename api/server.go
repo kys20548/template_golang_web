@@ -5,11 +5,11 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
 	"github.com/kys20548/template_golang_web/cache"
 	db "github.com/kys20548/template_golang_web/db/sqlc"
 	"github.com/kys20548/template_golang_web/util"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 // Server 負責處理所有 HTTP 請求。
@@ -69,6 +69,9 @@ func (server *Server) setupRouter() {
 
 	// 公開路由
 	router.GET("/healthz", server.healthCheck)
+	// readiness 探針要快進快出：掛更短的 timeout，DB 連不上時 2s 內就回 503，
+	// 不佔著探針等全域的 10s
+	router.GET("/readyz", timeoutMiddleware(2*time.Second), server.readyCheck)
 	router.POST("/users", server.createUser)
 	router.POST("/login", server.login)
 
