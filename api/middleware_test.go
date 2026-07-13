@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kys20548/template_golang_web/cache"
@@ -91,7 +92,7 @@ func TestAuthMiddleware(t *testing.T) {
 
 			// 裸 router：只掛被測的 middleware，不經過完整鏈
 			router := gin.New()
-			router.GET("/auth", authMiddleware(cacheMock), func(ctx *gin.Context) {
+			router.GET("/auth", authMiddleware(cacheMock, time.Minute), func(ctx *gin.Context) {
 				ok(ctx, getAuthUser(ctx))
 			})
 

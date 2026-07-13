@@ -5,7 +5,8 @@ Golang Web 專案模板：**gin + viper + sqlc + PostgreSQL + Redis + asynq**。
 ## 功能特色
 
 - **統一回應格式** `{code, msg, data}`，業務狀態碼集中在 `errcode/` 管理
-- **Token 驗證層**：Redis session、bcrypt 密碼、登入失敗鎖定、即時登出
+- **Token 驗證層**：Redis session、bcrypt 密碼、登入失敗鎖定、即時登出、
+  sliding TTL（活躍自動續期）、改密碼強制重新登入
 - **可觀測性**：Request ID 貫穿鏈路（zerolog）、操作日誌（audit log）、統一 panic 回應
 - **API 超時控制**：全域硬超時真正取消 DB/Redis 操作 + 個別路由慢請求 log
 - **排程與背景任務**：asynq scheduler 到點 enqueue、worker 執行，多 instance 以 `asynq.Unique` 去重
@@ -73,6 +74,7 @@ curl -X POST http://localhost:8080/login -d '{"username":"danny","password":"sec
 
 # 需驗證的路由（header 帶 token）
 curl -H "token: <token>" http://localhost:8080/me
+curl -X PUT -H "token: <token>" http://localhost:8080/me/password -d '{"old_password":"secret123","new_password":"newsecret456"}'  # 成功後需重新登入
 curl -H "token: <token>" http://localhost:8080/wallet   # 查登入者自己的錢包（user 來自 context）
 curl -H "token: <token>" http://localhost:8080/users/1
 curl -H "token: <token>" 'http://localhost:8080/users?pageNum=1&pageSize=5'
@@ -84,8 +86,9 @@ curl -H "token: <token>" 'http://localhost:8080/users?pageNum=1&pageSize=5'
       權限中介層；權限清單登入時放進 Redis session。開工前先對齊既有 Java 系統的權限表結構
 - [x] **`/readyz` readiness 端點** — ping DB/Redis，給 LB / ASG(ELB health check) /
       k8s readiness probe 判斷「這台能不能收流量」；依賴掛了是摘流量等恢復，不是自殺重啟
-- [ ] **Session 補完** — sliding TTL（活躍使用者自動續期，不會用到一半被登出）+
-      per-user session 反查（改密碼 / 停用帳號時踢掉該使用者所有 token）
+- [x] **Session 補完** — sliding TTL（活躍使用者自動續期，不會用到一半被登出）+
+      `PUT /me/password` 改密碼（刪除目前 session 強制重登；單一 session key 設計，
+      不做反查索引，取捨見 NOTES「驗證層」）
 - [ ] **kafka** — 有實際場景再加；原則：獨立 goroutine 執行、
       掛掉只記 log 不拖垮 HTTP server，graceful shutdown 時一併優雅關閉
 

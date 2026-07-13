@@ -25,6 +25,19 @@ handler 用 `getAuthUser(ctx)` 取得登入者資訊。
 連續失敗 5 次鎖定 15 分鐘（Redis 計數器）；`POST /logout` 刪除 session 即時登出。
 user 回應一律走 `userResponse`，不會帶出 hashed_password。
 
+**Session 生命週期**（單一 Redis key：`session:<token>` → AuthUser JSON，
+TTL = `TOKEN_DURATION`）：
+
+- **sliding TTL**：authMiddleware 驗證通過就把 TTL 重設回 `TOKEN_DURATION`——
+  活躍使用者不會用到一半被登出，閒置滿 `TOKEN_DURATION` 才過期。
+  續期失敗不影響本次請求（session 還沒過期），只記 WARN。
+- **改密碼**：`PUT /me/password` 驗舊密碼 → 改密碼 → 刪除目前的 session，
+  強制重新登入。
+- **取捨（刻意保持簡單）**：沒有 user → tokens 的反查索引，所以同一帳號的
+  其他 session（正常情況不會有——不會登入了一次又登入第二次）不會被踢，
+  留到 TTL 自然過期。之後若真需要「改密碼/停用帳號踢掉全部裝置」，
+  再加 `user_sessions:<id>` set 反查索引。
+
 ```bash
 TOKEN=$(curl -s -X POST localhost:8080/login -d '{"username":"danny","password":"secret123"}' | jq -r .data.token)
 curl -H "token: $TOKEN" localhost:8080/me

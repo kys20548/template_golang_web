@@ -27,6 +27,18 @@ definitions:
       msg:
         type: string
     type: object
+  api.changePasswordRequest:
+    properties:
+      new_password:
+        minLength: 6
+        type: string
+      old_password:
+        minLength: 6
+        type: string
+    required:
+    - new_password
+    - old_password
+    type: object
   api.createUserRequest:
     properties:
       email:
@@ -218,6 +230,33 @@ paths:
       security:
       - TokenAuth: []
       summary: 取得登入者資訊
+      tags:
+      - auth
+  /me/password:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: 舊密碼與新密碼
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.changePasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.Response'
+        "400":
+          description: 舊密碼錯誤或參數不合法
+          schema:
+            $ref: '#/definitions/api.Response'
+      security:
+      - TokenAuth: []
+      summary: 修改密碼（成功後目前 token 失效，需重新登入）
       tags:
       - auth
   /operation-logs:

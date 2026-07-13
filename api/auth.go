@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/kys20548/template_golang_web/cache"
+	db "github.com/kys20548/template_golang_web/db/sqlc"
 	"github.com/kys20548/template_golang_web/errcode"
 	"github.com/kys20548/template_golang_web/util"
 )
@@ -122,6 +123,72 @@ func (server *Server) logout(ctx *gin.Context) {
 		failInternal(ctx, err)
 		return
 	}
+	ok(ctx, nil)
+}
+
+type changePasswordRequest struct {
+	OldPassword string `json:"old_password" binding:"required,min=6"`
+	NewPassword string `json:"new_password" binding:"required,min=6"`
+}
+
+// changePassword 修改登入者自己的密碼，成功後刪除目前的 session，需重新登入。
+//
+// 取捨：session 只有 session:<token> 一個 key，沒有 user → tokens 的反查索引，
+// 所以「同一帳號的其他 session」（正常情況不會有）不會被踢，會留到 TTL 自然過期。
+// 之後若要做「改密碼/停用帳號踢掉全部 token」，再加反查索引。
+//
+// @Summary  修改密碼（成功後目前 token 失效，需重新登入）
+// @Tags     auth
+// @Accept   json
+// @Produce  json
+// @Security TokenAuth
+// @Param    body body changePasswordRequest true "舊密碼與新密碼"
+// @Success  200 {object} Response
+// @Failure  400 {object} Response "舊密碼錯誤或參數不合法"
+// @Router   /me/password [put]
+func (server *Server) changePassword(ctx *gin.Context) {
+	var req changePasswordRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		fail(ctx, http.StatusBadRequest, errcode.ErrInvalidParams, err)
+		return
+	}
+
+	authUser := getAuthUser(ctx)
+
+	user, err := server.store.GetUser(ctx, authUser.UserID)
+	if err != nil {
+		failInternal(ctx, err)
+		return
+	}
+
+	if err := util.CheckPassword(req.OldPassword, user.HashedPassword); err != nil {
+		fail(ctx, http.StatusBadRequest, errcode.ErrWrongCredentials, nil)
+		return
+	}
+
+	hashedPassword, err := util.HashPassword(req.NewPassword)
+	if err != nil {
+		failInternal(ctx, err)
+		return
+	}
+
+	err = server.store.UpdateUserPassword(ctx, db.UpdateUserPasswordParams{
+		ID:             authUser.UserID,
+		HashedPassword: hashedPassword,
+	})
+	if err != nil {
+		failInternal(ctx, err)
+		return
+	}
+
+	// 刪除目前的 session，強制重新登入；失敗只記 log——
+	// 密碼已改成功，這個 session 本來就是本人的，留著到過期也無害
+	token := ctx.GetHeader(tokenHeaderKey)
+	if err := server.cache.Del(ctx, sessionKey(token)); err != nil {
+		getLogger(ctx).Warn().Err(err).Msg("cannot delete session after password change")
+	}
+
+	getLogger(ctx).Info().Int64("user_id", authUser.UserID).Msg("password changed")
 	ok(ctx, nil)
 }
 

@@ -27,3 +27,8 @@ SELECT count(*) FROM users;
 -- name: DeleteUser :exec
 DELETE FROM users
 WHERE id = $1;
+
+-- name: UpdateUserPassword :exec
+UPDATE users
+SET hashed_password = $2
+WHERE id = $1;

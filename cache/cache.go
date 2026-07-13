@@ -18,6 +18,8 @@ type Cache interface {
 	Del(ctx context.Context, keys ...string) error
 	// Incr 將 key 的整數值 +1 並回傳新值，第一次建立時設定 ttl。
 	Incr(ctx context.Context, key string, ttl time.Duration) (int64, error)
+	// Expire 重設 key 的存活時間；key 不存在時不做事（不視為錯誤）。
+	Expire(ctx context.Context, key string, ttl time.Duration) error
 	// Ping 檢查連線是否正常，供啟動檢查與 readiness 探針使用。
 	Ping(ctx context.Context) error
 }
@@ -53,6 +55,12 @@ func (c *RedisCache) Set(ctx context.Context, key string, value string, ttl time
 
 func (c *RedisCache) Del(ctx context.Context, keys ...string) error {
 	return c.client.Del(ctx, keys...).Err()
+}
+
+func (c *RedisCache) Expire(ctx context.Context, key string, ttl time.Duration) error {
+	// EXPIRE 對不存在的 key 回 false，不視為錯誤：
+	// sliding TTL 的場景下 key 剛好過期就讓它過期，下次請求會被驗證層擋下
+	return c.client.Expire(ctx, key, ttl).Err()
 }
 
 func (c *RedisCache) Incr(ctx context.Context, key string, ttl time.Duration) (int64, error) {

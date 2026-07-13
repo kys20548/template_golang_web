@@ -22,6 +22,7 @@ type Querier interface {
 	GetWalletByUserID(ctx context.Context, userID int64) (Wallet, error)
 	ListOperationLogs(ctx context.Context, arg ListOperationLogsParams) ([]OperationLog, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
+	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
 }
 
 var _ Querier = (*Queries)(nil)

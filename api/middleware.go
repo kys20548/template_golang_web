@@ -45,7 +45,9 @@ func sessionKey(token string) string {
 
 // authMiddleware 驗證層：從 header 取出 token，確認存在於 Redis 後
 // 將 user 資訊放入 context，否則中斷請求。
-func authMiddleware(cacheStore cache.Cache) gin.HandlerFunc {
+// 驗證通過時做 sliding TTL：把 session 的存活時間重設回 tokenDuration——
+// 活躍使用者不會用到一半被登出，閒置滿 tokenDuration 才過期。
+func authMiddleware(cacheStore cache.Cache, tokenDuration time.Duration) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		token := ctx.GetHeader(tokenHeaderKey)
 		if token == "" {
@@ -67,6 +69,11 @@ func authMiddleware(cacheStore cache.Cache) gin.HandlerFunc {
 		if err := json.Unmarshal([]byte(val), &user); err != nil {
 			failAbort(ctx, http.StatusInternalServerError, errcode.ErrInternal, err)
 			return
+		}
+
+		// sliding TTL：續期失敗不影響本次請求（session 還沒過期），只記 log
+		if err := cacheStore.Expire(ctx, sessionKey(token), tokenDuration); err != nil {
+			getLogger(ctx).Warn().Err(err).Msg("cannot refresh session ttl")
 		}
 
 		ctx.Set(authUserKey, user)

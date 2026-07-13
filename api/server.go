@@ -76,9 +76,10 @@ func (server *Server) setupRouter() {
 	router.POST("/login", server.login)
 
 	// 需要驗證的路由：header 帶 token，經 authMiddleware 驗證後才會進到 handler
-	authRoutes := router.Group("/").Use(authMiddleware(server.cache))
+	authRoutes := router.Group("/").Use(authMiddleware(server.cache, server.config.TokenDuration))
 	authRoutes.POST("/logout", server.logout)
 	authRoutes.GET("/me", server.me)
+	authRoutes.PUT("/me/password", server.changePassword)
 	authRoutes.GET("/wallet", server.getMyWallet)
 	authRoutes.GET("/users/:id", server.getUser)
 	// 個別路由範例：超過 2s 印 slow request WARN log（不中斷請求）

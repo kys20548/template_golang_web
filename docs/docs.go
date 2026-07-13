@@ -151,6 +151,50 @@ const docTemplate = `{
                 }
             }
         },
+        "/me/password": {
+            "put": {
+                "security": [
+                    {
+                        "TokenAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "修改密碼（成功後目前 token 失效，需重新登入）",
+                "parameters": [
+                    {
+                        "description": "舊密碼與新密碼",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.changePasswordRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "舊密碼錯誤或參數不合法",
+                        "schema": {
+                            "$ref": "#/definitions/api.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/operation-logs": {
             "get": {
                 "security": [
@@ -486,6 +530,23 @@ const docTemplate = `{
                 "data": {},
                 "msg": {
                     "type": "string"
+                }
+            }
+        },
+        "api.changePasswordRequest": {
+            "type": "object",
+            "required": [
+                "new_password",
+                "old_password"
+            ],
+            "properties": {
+                "new_password": {
+                    "type": "string",
+                    "minLength": 6
+                },
+                "old_password": {
+                    "type": "string",
+                    "minLength": 6
                 }
             }
         },

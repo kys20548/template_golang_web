@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -14,6 +16,7 @@ import (
 	mockdb "github.com/kys20548/template_golang_web/db/mock"
 	db "github.com/kys20548/template_golang_web/db/sqlc"
 	"github.com/kys20548/template_golang_web/errcode"
+	"github.com/kys20548/template_golang_web/util"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )
@@ -232,4 +235,153 @@ func TestMeAPI(t *testing.T) {
 	var got AuthUser
 	require.Equal(t, errcode.Success, parseResponse(t, recorder.Body, &got))
 	require.Equal(t, toAuthUser(user), got)
+}
+
+// eqUpdateUserPasswordParams：同 eqCreateUserTxParams 的思路——
+// bcrypt 雜湊無法預測，用 CheckPassword 驗證雜湊來源後再比對其餘欄位。
+type eqUpdateUserPasswordParamsMatcher struct {
+	userID   int64
+	password string
+}
+
+func (e eqUpdateUserPasswordParamsMatcher) Matches(x any) bool {
+	arg, ok := x.(db.UpdateUserPasswordParams)
+	if !ok {
+		return false
+	}
+	if arg.ID != e.userID {
+		return false
+	}
+	return util.CheckPassword(e.password, arg.HashedPassword) == nil
+}
+
+func (e eqUpdateUserPasswordParamsMatcher) String() string {
+	return fmt.Sprintf("matches user id %d and new password %v", e.userID, e.password)
+}
+
+func eqUpdateUserPasswordParams(userID int64, password string) gomock.Matcher {
+	return eqUpdateUserPasswordParamsMatcher{userID: userID, password: password}
+}
+
+func TestChangePasswordAPI(t *testing.T) {
+	user, password := testUser(t)
+	newPassword := "newsecret456"
+
+	testCases := []struct {
+		name          string
+		body          gin.H
+		buildStubs    func(store *mockdb.MockStore, cacheMock *mockcache.MockCache)
+		checkResponse func(t *testing.T, recorder *httptest.ResponseRecorder)
+	}{
+		{
+			name: "OK",
+			body: gin.H{"old_password": password, "new_password": newPassword},
+			buildStubs: func(store *mockdb.MockStore, cacheMock *mockcache.MockCache) {
+				store.EXPECT().
+					GetUser(gomock.Any(), gomock.Eq(user.ID)).
+					Times(1).
+					Return(user, nil)
+				store.EXPECT().
+					UpdateUserPassword(gomock.Any(), eqUpdateUserPasswordParams(user.ID, newPassword)).
+					Times(1).
+					Return(nil)
+				// 改完密碼刪掉目前的 session，強制重新登入
+				cacheMock.EXPECT().
+					Del(gomock.Any(), gomock.Eq(sessionKey("fake-token"))).
+					Times(1).
+					Return(nil)
+				store.EXPECT().
+					CreateOperationLog(gomock.Any(), gomock.Any()).
+					Times(1).
+					Return(db.OperationLog{}, nil)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusOK, recorder.Code)
+				require.Equal(t, errcode.Success, parseResponse(t, recorder.Body, nil))
+			},
+		},
+		{
+			name: "WrongOldPassword",
+			body: gin.H{"old_password": "wrong-password", "new_password": newPassword},
+			buildStubs: func(store *mockdb.MockStore, cacheMock *mockcache.MockCache) {
+				store.EXPECT().
+					GetUser(gomock.Any(), gomock.Eq(user.ID)).
+					Times(1).
+					Return(user, nil)
+				// 舊密碼錯：不能改密碼、不能動 session
+				store.EXPECT().UpdateUserPassword(gomock.Any(), gomock.Any()).Times(0)
+				cacheMock.EXPECT().Del(gomock.Any(), gomock.Any()).Times(0)
+				store.EXPECT().
+					CreateOperationLog(gomock.Any(), gomock.Any()).
+					Times(1).
+					Return(db.OperationLog{}, nil)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusBadRequest, recorder.Code)
+				require.Equal(t, errcode.ErrWrongCredentials, parseResponse(t, recorder.Body, nil))
+			},
+		},
+		{
+			name: "NewPasswordTooShort",
+			body: gin.H{"old_password": password, "new_password": "123"},
+			buildStubs: func(store *mockdb.MockStore, cacheMock *mockcache.MockCache) {
+				// 參數驗證失敗就不該碰 DB
+				store.EXPECT().GetUser(gomock.Any(), gomock.Any()).Times(0)
+				store.EXPECT().
+					CreateOperationLog(gomock.Any(), gomock.Any()).
+					Times(1).
+					Return(db.OperationLog{}, nil)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusBadRequest, recorder.Code)
+				require.Equal(t, errcode.ErrInvalidParams, parseResponse(t, recorder.Body, nil))
+			},
+		},
+		{
+			name: "UpdateFails",
+			body: gin.H{"old_password": password, "new_password": newPassword},
+			buildStubs: func(store *mockdb.MockStore, cacheMock *mockcache.MockCache) {
+				store.EXPECT().
+					GetUser(gomock.Any(), gomock.Eq(user.ID)).
+					Times(1).
+					Return(user, nil)
+				store.EXPECT().
+					UpdateUserPassword(gomock.Any(), gomock.Any()).
+					Times(1).
+					Return(errors.New("db is down"))
+				// 密碼沒改成，session 不能動
+				cacheMock.EXPECT().Del(gomock.Any(), gomock.Any()).Times(0)
+				store.EXPECT().
+					CreateOperationLog(gomock.Any(), gomock.Any()).
+					Times(1).
+					Return(db.OperationLog{}, nil)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusInternalServerError, recorder.Code)
+				require.Equal(t, errcode.ErrInternal, parseResponse(t, recorder.Body, nil))
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			store := mockdb.NewMockStore(ctrl)
+			cacheMock := mockcache.NewMockCache(ctrl)
+			tc.buildStubs(store, cacheMock)
+
+			server := newTestServer(t, store, cacheMock)
+			recorder := httptest.NewRecorder()
+
+			body, err := json.Marshal(tc.body)
+			require.NoError(t, err)
+
+			request, err := http.NewRequest(http.MethodPut, "/me/password", bytes.NewReader(body))
+			require.NoError(t, err)
+			setupAuth(t, request, cacheMock, toAuthUser(user))
+
+			server.Router().ServeHTTP(recorder, request)
+			tc.checkResponse(t, recorder)
+		})
+	}
 }
