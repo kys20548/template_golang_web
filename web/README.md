@@ -1,8 +1,8 @@
 # 後台前端
 
 Vue 3 + Vite + Vue Router，純 JS（不含 TypeScript / Pinia / UI 框架，規模用不到，
-之後頁面變多再評估要不要加）。登入後為 sidebar + 內容區的後台版型，涵蓋使用者查詢、
-錢包餘額、操作日誌、修改密碼。
+之後頁面變多再評估要不要加）。登入後為 sidebar + 內容區的後台版型，涵蓋前台/後台
+使用者查詢、前台使用者錢包列表、操作日誌、修改密碼；登入帳號是後台 user（`admin_users`）。
 
 對接的後端 API 見專案根目錄 [README](../README.md) 與 [NOTES.md](../NOTES.md)。
 
@@ -25,10 +25,11 @@ src/
     AppShell.vue      # 登入後的版型：sidebar 導覽 + topbar（使用者 + 登出）
     Pagination.vue    # 分頁列表共用的上一頁/下一頁元件
   views/
-    LoginView.vue          # 登入
+    LoginView.vue          # 登入（後台 user）
     DashboardView.vue      # 首頁：快捷入口卡片
-    UsersView.vue          # 使用者分頁列表 + 依 ID 查詢
-    WalletView.vue         # 自己的錢包餘額
+    UsersView.vue          # 前台使用者分頁列表 + 依 ID 查詢
+    AdminUsersView.vue     # 後台使用者分頁列表
+    WalletsView.vue        # 前台使用者錢包分頁列表
     OperationLogsView.vue  # 操作日誌分頁列表
     ChangePasswordView.vue # 修改密碼（成功後導回登入頁）
 ```

@@ -33,11 +33,12 @@ type loginRequest struct {
 }
 
 type loginResponse struct {
-	Token string       `json:"token"`
-	User  userResponse `json:"user"`
+	Token string            `json:"token"`
+	User  adminUserResponse `json:"user"`
 }
 
-// login 驗證帳號密碼後產生 token，把 user 資訊存入 Redis。
+// login 驗證後台 user 的帳號密碼後產生 token，把 user 資訊存入 Redis。
+// 本專案是後台系統，登入者一律是 admin_users；前台 user（users 表）不在這裡登入。
 // 帳號不存在與密碼錯誤回同一個錯誤碼，避免洩漏帳號是否存在。
 //
 // @Summary  登入
@@ -65,7 +66,7 @@ func (server *Server) login(ctx *gin.Context) {
 		return
 	}
 
-	user, err := server.store.GetUserByUsername(ctx, req.Username)
+	user, err := server.store.GetAdminUserByUsername(ctx, req.Username)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			server.recordLoginFail(ctx, req.Username)
@@ -91,7 +92,6 @@ func (server *Server) login(ctx *gin.Context) {
 	authUser := AuthUser{
 		UserID:   user.ID,
 		Username: user.Username,
-		Email:    user.Email,
 	}
 	payload, err := json.Marshal(authUser)
 	if err != nil {
@@ -105,7 +105,7 @@ func (server *Server) login(ctx *gin.Context) {
 		return
 	}
 
-	ok(ctx, loginResponse{Token: token, User: newUserResponse(user)})
+	ok(ctx, loginResponse{Token: token, User: newAdminUserResponse(user)})
 }
 
 // logout 刪除 Redis 上的 session，token 立即失效。
@@ -131,7 +131,7 @@ type changePasswordRequest struct {
 	NewPassword string `json:"new_password" binding:"required,min=6"`
 }
 
-// changePassword 修改登入者自己的密碼，成功後刪除目前的 session，需重新登入。
+// changePassword 修改登入者（後台 user）自己的密碼，成功後刪除目前的 session，需重新登入。
 //
 // 取捨：session 只有 session:<token> 一個 key，沒有 user → tokens 的反查索引，
 // 所以「同一帳號的其他 session」（正常情況不會有）不會被踢，會留到 TTL 自然過期。
@@ -155,7 +155,7 @@ func (server *Server) changePassword(ctx *gin.Context) {
 
 	authUser := getAuthUser(ctx)
 
-	user, err := server.store.GetUser(ctx, authUser.UserID)
+	user, err := server.store.GetAdminUser(ctx, authUser.UserID)
 	if err != nil {
 		failInternal(ctx, err)
 		return
@@ -172,7 +172,7 @@ func (server *Server) changePassword(ctx *gin.Context) {
 		return
 	}
 
-	err = server.store.UpdateUserPassword(ctx, db.UpdateUserPasswordParams{
+	err = server.store.UpdateAdminUserPassword(ctx, db.UpdateAdminUserPasswordParams{
 		ID:             authUser.UserID,
 		HashedPassword: hashedPassword,
 	})

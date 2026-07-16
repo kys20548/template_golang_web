@@ -17,13 +17,21 @@ err 只進 log 不回傳給 client。
 
 ## 驗證層
 
+**前台/後台 user 分離**：本專案定位是後台系統，登入者一律是後台 user
+（`admin_users` 表：username + hashed_password，migration 含種子帳號
+admin/admin123，部署後請立即改密碼）。`users` 表是前台 user（公開註冊
+`POST /users`，一對一綁錢包），在後台只做查詢對象（`GET /users`、
+`GET /admin-users`、`GET /wallets`），不能登入後台。兩種 user 不共表——
+欄位需求（前台要 email/錢包）與生命週期（前台自助註冊 vs 後台人工開通）不同，
+硬塞同一張表加 type 欄位只會讓每條 query 都要記得過濾。
+
 需要登入的路由掛 `authMiddleware`：header 帶 `token`，middleware 確認
-token 存在 Redis（key: `session:<token>`）後，把 `AuthUser` 放進 gin context，
-handler 用 `getAuthUser(ctx)` 取得登入者資訊。
+token 存在 Redis（key: `session:<token>`）後，把 `AuthUser`（後台 user 的
+id + username）放進 gin context，handler 用 `getAuthUser(ctx)` 取得登入者資訊。
 
 登入安全：密碼以 bcrypt 儲存；帳號不存在與密碼錯誤回同一個錯誤碼（20003）；
 連續失敗 5 次鎖定 15 分鐘（Redis 計數器）；`POST /logout` 刪除 session 即時登出。
-user 回應一律走 `userResponse`，不會帶出 hashed_password。
+user 對外回應一律走 `userResponse` / `adminUserResponse`，不會帶出 hashed_password。
 
 **Session 生命週期**（單一 Redis key：`session:<token>` → AuthUser JSON，
 TTL = `TOKEN_DURATION`）：
@@ -39,7 +47,7 @@ TTL = `TOKEN_DURATION`）：
   再加 `user_sessions:<id>` set 反查索引。
 
 ```bash
-TOKEN=$(curl -s -X POST localhost:8080/login -d '{"username":"danny","password":"secret123"}' | jq -r .data.token)
+TOKEN=$(curl -s -X POST localhost:8080/login -d '{"username":"admin","password":"admin123"}' | jq -r .data.token)
 curl -H "token: $TOKEN" localhost:8080/me
 ```
 
@@ -321,10 +329,13 @@ build context 會把前端整包一起複製進去。
 
 第一輪刻意只做骨架驗證整條路徑：登入頁打 `POST /login`，dashboard 用
 `GET /me` 證明 token 驗證全程有效，再加登出——同時把 CORS、header-based auth、
-統一回應 envelope 解析都走一遍，之後加其他後台頁面是重複同個 pattern。
+統一回應 envelope 解析都走一遍。第二輪補齊後台頁面：AppShell（sidebar +
+topbar）巢狀路由版型，前台/後台使用者、錢包、操作日誌都是「分頁表格 +
+Pagination 元件」同一個 pattern，樣式集中在 style.css 的 design tokens
+（CSS 變數，支援 light/dark）。
 
-技術選型：Vue 3 + Vite + 純 JS，不加 TypeScript / Pinia / UI 框架（目前只有
-兩頁，規模用不到，YAGNI；頁面數量真的變多再評估要不要加狀態管理）。
+技術選型：Vue 3 + Vite + 純 JS，不加 TypeScript / Pinia / UI 框架（這個
+頁面數量規模用不到，YAGNI；真的變多再評估要不要加狀態管理）。
 
 - `src/api/client.js`：`fetch` 包裝，自動帶 `token` header（從
   `auth/session.js` 讀），base URL 讀 `import.meta.env.VITE_API_BASE_URL`，

@@ -67,8 +67,8 @@ func setupAuth(t *testing.T, request *http.Request, cacheMock *mockcache.MockCac
 	request.Header.Set(tokenHeaderKey, token)
 }
 
-// testUser 產生測試用 user 與其明文密碼，
-// hashed_password 是真的 bcrypt 雜湊，login 測試才能驗證密碼比對邏輯。
+// testUser 產生測試用前台 user 與其明文密碼，
+// hashed_password 是真的 bcrypt 雜湊，供 createUser 等測試當資料用。
 func testUser(t *testing.T) (db.User, string) {
 	password := "secret123"
 	hashedPassword, err := util.HashPassword(password)
@@ -83,11 +83,25 @@ func testUser(t *testing.T) (db.User, string) {
 	}, password
 }
 
-func toAuthUser(user db.User) AuthUser {
+// testAdminUser 產生測試用後台 user 與其明文密碼——登入者一律是後台 user，
+// login / changePassword 測試靠真的 bcrypt 雜湊驗證密碼比對邏輯。
+func testAdminUser(t *testing.T) (db.AdminUser, string) {
+	password := "admin123"
+	hashedPassword, err := util.HashPassword(password)
+	require.NoError(t, err)
+
+	return db.AdminUser{
+		ID:             1,
+		Username:       "admin",
+		HashedPassword: hashedPassword,
+		CreatedAt:      time.Now().UTC().Truncate(time.Second),
+	}, password
+}
+
+func toAuthUser(user db.AdminUser) AuthUser {
 	return AuthUser{
 		UserID:   user.ID,
 		Username: user.Username,
-		Email:    user.Email,
 	}
 }
 

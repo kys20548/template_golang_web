@@ -20,7 +20,7 @@ import (
 // 裸的 gin router 只掛它一個來測（單元視角），互不干擾。
 // 測試路由的 handler 回傳 context 裡的登入者，驗證放行 / 中斷行為。
 func TestAuthMiddleware(t *testing.T) {
-	authUser := AuthUser{UserID: 1, Username: "alice", Email: "alice@example.com"}
+	authUser := AuthUser{UserID: 1, Username: "admin"}
 
 	testCases := []struct {
 		name          string

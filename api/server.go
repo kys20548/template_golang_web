@@ -80,10 +80,11 @@ func (server *Server) setupRouter() {
 	authRoutes.POST("/logout", server.logout)
 	authRoutes.GET("/me", server.me)
 	authRoutes.PUT("/me/password", server.changePassword)
-	authRoutes.GET("/wallet", server.getMyWallet)
+	authRoutes.GET("/wallets", server.listWallets)
 	authRoutes.GET("/users/:id", server.getUser)
 	// 個別路由範例：超過 2s 印 slow request WARN log（不中斷請求）
 	authRoutes.GET("/users", slowLogMiddleware(2000*time.Millisecond), server.listUsers)
+	authRoutes.GET("/admin-users", server.listAdminUsers)
 	authRoutes.GET("/operation-logs", server.listOperationLogs)
 
 	server.router = router

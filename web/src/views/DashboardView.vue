@@ -12,12 +12,16 @@ const user = inject('authUser')
 
   <div class="card-grid">
     <router-link to="/users" class="card">
-      <div class="stat-label">使用者</div>
+      <div class="stat-label">前台使用者</div>
       <p class="muted" style="margin: 0">查詢帳號、瀏覽分頁列表</p>
     </router-link>
-    <router-link to="/wallet" class="card">
-      <div class="stat-label">我的錢包</div>
-      <p class="muted" style="margin: 0">查看目前餘額</p>
+    <router-link to="/admin-users" class="card">
+      <div class="stat-label">後台使用者</div>
+      <p class="muted" style="margin: 0">可登入本後台的帳號</p>
+    </router-link>
+    <router-link to="/wallets" class="card">
+      <div class="stat-label">錢包</div>
+      <p class="muted" style="margin: 0">所有前台使用者的餘額</p>
     </router-link>
     <router-link to="/operation-logs" class="card">
       <div class="stat-label">操作日誌</div>

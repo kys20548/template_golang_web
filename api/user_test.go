@@ -67,6 +67,7 @@ func TestHealthzAPI(t *testing.T) {
 // 驗什麼（checkResponse）；發請求的流程共用最下面那一段。
 func TestGetUserAPI(t *testing.T) {
 	user, _ := testUser(t)
+	adminUser, _ := testAdminUser(t)
 
 	testCases := []struct {
 		name          string
@@ -79,7 +80,7 @@ func TestGetUserAPI(t *testing.T) {
 			name: "OK",
 			url:  fmt.Sprintf("/users/%d", user.ID),
 			setupAuth: func(t *testing.T, request *http.Request, cacheMock *mockcache.MockCache) {
-				setupAuth(t, request, cacheMock, toAuthUser(user))
+				setupAuth(t, request, cacheMock, toAuthUser(adminUser))
 			},
 			buildStubs: func(store *mockdb.MockStore) {
 				store.EXPECT().
@@ -99,7 +100,7 @@ func TestGetUserAPI(t *testing.T) {
 			name: "NotFound",
 			url:  fmt.Sprintf("/users/%d", user.ID),
 			setupAuth: func(t *testing.T, request *http.Request, cacheMock *mockcache.MockCache) {
-				setupAuth(t, request, cacheMock, toAuthUser(user))
+				setupAuth(t, request, cacheMock, toAuthUser(adminUser))
 			},
 			buildStubs: func(store *mockdb.MockStore) {
 				// handler 對 sql.ErrNoRows 要轉成 404 + 業務碼 20001
@@ -117,7 +118,7 @@ func TestGetUserAPI(t *testing.T) {
 			name: "InternalError",
 			url:  fmt.Sprintf("/users/%d", user.ID),
 			setupAuth: func(t *testing.T, request *http.Request, cacheMock *mockcache.MockCache) {
-				setupAuth(t, request, cacheMock, toAuthUser(user))
+				setupAuth(t, request, cacheMock, toAuthUser(adminUser))
 			},
 			buildStubs: func(store *mockdb.MockStore) {
 				// 其他 DB 錯誤走 failInternal → 500 + 10001
@@ -135,7 +136,7 @@ func TestGetUserAPI(t *testing.T) {
 			name: "InvalidID",
 			url:  "/users/0", // binding min=1，參數驗證就擋掉
 			setupAuth: func(t *testing.T, request *http.Request, cacheMock *mockcache.MockCache) {
-				setupAuth(t, request, cacheMock, toAuthUser(user))
+				setupAuth(t, request, cacheMock, toAuthUser(adminUser))
 			},
 			buildStubs: func(store *mockdb.MockStore) {
 				// Times(0)：參數不合法就不該打 DB——短路行為也是被驗證的
@@ -358,7 +359,7 @@ func TestCreateUserAPI(t *testing.T) {
 }
 
 func TestListUsersAPI(t *testing.T) {
-	user, _ := testUser(t)
+	adminUser, _ := testAdminUser(t)
 	users := []db.User{
 		{ID: 1, Username: "alice", Email: "alice@example.com"},
 		{ID: 2, Username: "bob", Email: "bob@example.com"},
@@ -436,7 +437,7 @@ func TestListUsersAPI(t *testing.T) {
 
 			request, err := http.NewRequest(http.MethodGet, tc.url, nil)
 			require.NoError(t, err)
-			setupAuth(t, request, cacheMock, toAuthUser(user))
+			setupAuth(t, request, cacheMock, toAuthUser(adminUser))
 
 			server.Router().ServeHTTP(recorder, request)
 			tc.checkResponse(t, recorder)

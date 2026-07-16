@@ -37,8 +37,9 @@ async function onLogout() {
       </div>
       <nav class="nav">
         <router-link to="/dashboard">首頁</router-link>
-        <router-link to="/users">使用者</router-link>
-        <router-link to="/wallet">我的錢包</router-link>
+        <router-link to="/users">前台使用者</router-link>
+        <router-link to="/admin-users">後台使用者</router-link>
+        <router-link to="/wallets">錢包</router-link>
         <router-link to="/operation-logs">操作日誌</router-link>
         <router-link to="/me/password">修改密碼</router-link>
       </nav>

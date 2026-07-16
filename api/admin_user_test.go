@@ -14,12 +14,11 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-// TestListWalletsAPI 測 GET /wallets——後台檢視所有前台 user 的錢包（分頁）。
-func TestListWalletsAPI(t *testing.T) {
+func TestListAdminUsersAPI(t *testing.T) {
 	adminUser, _ := testAdminUser(t)
-	wallets := []db.ListWalletsRow{
-		{ID: 1, UserID: 1, Username: "alice", Email: "alice@example.com", Balance: 1000},
-		{ID: 2, UserID: 2, Username: "bob", Email: "bob@example.com", Balance: 0},
+	adminUsers := []db.AdminUser{
+		{ID: 1, Username: "admin"},
+		{ID: 2, Username: "operator"},
 	}
 
 	testCases := []struct {
@@ -30,14 +29,14 @@ func TestListWalletsAPI(t *testing.T) {
 	}{
 		{
 			name: "OK",
-			url:  "/wallets?pageNum=1&pageSize=10",
+			url:  "/admin-users?pageNum=1&pageSize=10",
 			buildStubs: func(store *mockdb.MockStore) {
 				store.EXPECT().
-					ListWallets(gomock.Any(), gomock.Eq(db.ListWalletsParams{Limit: 10, Offset: 0})).
+					ListAdminUsers(gomock.Any(), gomock.Eq(db.ListAdminUsersParams{Limit: 10, Offset: 0})).
 					Times(1).
-					Return(wallets, nil)
+					Return(adminUsers, nil)
 				store.EXPECT().
-					CountWallets(gomock.Any()).
+					CountAdminUsers(gomock.Any()).
 					Times(1).
 					Return(int64(2), nil)
 			},
@@ -45,21 +44,20 @@ func TestListWalletsAPI(t *testing.T) {
 				require.Equal(t, http.StatusOK, recorder.Code)
 
 				var got struct {
-					PageNum  int32               `json:"pageNum"`
-					PageSize int32               `json:"pageSize"`
-					Total    int64               `json:"total"`
-					List     []db.ListWalletsRow `json:"list"`
+					Total int64               `json:"total"`
+					List  []adminUserResponse `json:"list"`
 				}
 				require.Equal(t, errcode.Success, parseResponse(t, recorder.Body, &got))
 				require.Equal(t, int64(2), got.Total)
-				require.Equal(t, wallets, got.List)
+				require.Len(t, got.List, 2)
+				require.Equal(t, newAdminUserResponse(adminUsers[0]), got.List[0])
 			},
 		},
 		{
-			name: "InvalidPageSize",
-			url:  "/wallets?pageNum=1&pageSize=100", // binding max=50
+			name: "InvalidPageNum",
+			url:  "/admin-users?pageNum=0&pageSize=10", // binding min=1
 			buildStubs: func(store *mockdb.MockStore) {
-				store.EXPECT().ListWallets(gomock.Any(), gomock.Any()).Times(0)
+				store.EXPECT().ListAdminUsers(gomock.Any(), gomock.Any()).Times(0)
 			},
 			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
 				require.Equal(t, http.StatusBadRequest, recorder.Code)
@@ -68,10 +66,10 @@ func TestListWalletsAPI(t *testing.T) {
 		},
 		{
 			name: "InternalError",
-			url:  "/wallets?pageNum=1&pageSize=10",
+			url:  "/admin-users?pageNum=1&pageSize=10",
 			buildStubs: func(store *mockdb.MockStore) {
 				store.EXPECT().
-					ListWallets(gomock.Any(), gomock.Any()).
+					ListAdminUsers(gomock.Any(), gomock.Any()).
 					Times(1).
 					Return(nil, sql.ErrConnDone)
 			},

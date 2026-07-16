@@ -2,8 +2,6 @@ basePath: /
 definitions:
   api.AuthUser:
     properties:
-      email:
-        type: string
       user_id:
         type: integer
       username:
@@ -25,6 +23,15 @@ definitions:
         $ref: '#/definitions/errcode.Code'
       data: {}
       msg:
+        type: string
+    type: object
+  api.adminUserResponse:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      username:
         type: string
     type: object
   api.changePasswordRequest:
@@ -76,7 +83,7 @@ definitions:
       token:
         type: string
       user:
-        $ref: '#/definitions/api.userResponse'
+        $ref: '#/definitions/api.adminUserResponse'
     type: object
   api.operationLogResponse:
     properties:
@@ -110,6 +117,21 @@ definitions:
       username:
         type: string
     type: object
+  db.ListWalletsRow:
+    properties:
+      balance:
+        type: integer
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: integer
+      user_id:
+        type: integer
+      username:
+        type: string
+    type: object
   db.Wallet:
     properties:
       balance:
@@ -134,7 +156,6 @@ definitions:
     - 20002
     - 20003
     - 20004
-    - 30001
     type: integer
     x-enum-varnames:
     - Success
@@ -148,7 +169,6 @@ definitions:
     - ErrUserExists
     - ErrWrongCredentials
     - ErrTooManyLoginFails
-    - ErrWalletNotFound
 host: localhost:8080
 info:
   contact: {}
@@ -156,6 +176,43 @@ info:
   title: template_golang_web API
   version: "1.0"
 paths:
+  /admin-users:
+    get:
+      parameters:
+      - description: 頁碼（從 1 開始）
+        in: query
+        name: pageNum
+        required: true
+        type: integer
+      - description: 每頁筆數（5-50）
+        in: query
+        name: pageSize
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/api.PageResult'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/api.adminUserResponse'
+                        type: array
+                    type: object
+              type: object
+      security:
+      - TokenAuth: []
+      summary: 後台使用者列表
+      tags:
+      - admin-user
   /healthz:
     get:
       produces:
@@ -404,8 +461,19 @@ paths:
       summary: 查詢使用者
       tags:
       - user
-  /wallet:
+  /wallets:
     get:
+      parameters:
+      - description: 頁碼（從 1 開始）
+        in: query
+        name: pageNum
+        required: true
+        type: integer
+      - description: 每頁筆數（5-50）
+        in: query
+        name: pageSize
+        required: true
+        type: integer
       produces:
       - application/json
       responses:
@@ -416,11 +484,18 @@ paths:
             - $ref: '#/definitions/api.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/db.Wallet'
+                  allOf:
+                  - $ref: '#/definitions/api.PageResult'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/db.ListWalletsRow'
+                        type: array
+                    type: object
               type: object
       security:
       - TokenAuth: []
-      summary: 查詢自己的錢包
+      summary: 錢包列表（前台 user）
       tags:
       - wallet
 securityDefinitions:

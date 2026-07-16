@@ -16,7 +16,7 @@ import (
 )
 
 func TestListOperationLogsAPI(t *testing.T) {
-	user, _ := testUser(t)
+	user, _ := testAdminUser(t)
 	logs := []db.OperationLog{
 		{
 			ID:        2,

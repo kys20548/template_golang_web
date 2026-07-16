@@ -15,6 +15,73 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/admin-users": {
+            "get": {
+                "security": [
+                    {
+                        "TokenAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-user"
+                ],
+                "summary": "後台使用者列表",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "頁碼（從 1 開始）",
+                        "name": "pageNum",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每頁筆數（5-50）",
+                        "name": "pageSize",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/definitions/api.PageResult"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "list": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/definitions/api.adminUserResponse"
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/healthz": {
             "get": {
                 "produces": [
@@ -454,7 +521,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/wallet": {
+        "/wallets": {
             "get": {
                 "security": [
                     {
@@ -467,7 +534,23 @@ const docTemplate = `{
                 "tags": [
                     "wallet"
                 ],
-                "summary": "查詢自己的錢包",
+                "summary": "錢包列表（前台 user）",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "頁碼（從 1 開始）",
+                        "name": "pageNum",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每頁筆數（5-50）",
+                        "name": "pageSize",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -480,7 +563,22 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/db.Wallet"
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/definitions/api.PageResult"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "list": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/definitions/db.ListWalletsRow"
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            ]
                                         }
                                     }
                                 }
@@ -495,9 +593,6 @@ const docTemplate = `{
         "api.AuthUser": {
             "type": "object",
             "properties": {
-                "email": {
-                    "type": "string"
-                },
                 "user_id": {
                     "type": "integer"
                 },
@@ -529,6 +624,20 @@ const docTemplate = `{
                 },
                 "data": {},
                 "msg": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.adminUserResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "username": {
                     "type": "string"
                 }
             }
@@ -604,7 +713,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "user": {
-                    "$ref": "#/definitions/api.userResponse"
+                    "$ref": "#/definitions/api.adminUserResponse"
                 }
             }
         },
@@ -657,6 +766,29 @@ const docTemplate = `{
                 }
             }
         },
+        "db.ListWalletsRow": {
+            "type": "object",
+            "properties": {
+                "balance": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "user_id": {
+                    "type": "integer"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
         "db.Wallet": {
             "type": "object",
             "properties": {
@@ -687,8 +819,7 @@ const docTemplate = `{
                 20001,
                 20002,
                 20003,
-                20004,
-                30001
+                20004
             ],
             "x-enum-varnames": [
                 "Success",
@@ -701,8 +832,7 @@ const docTemplate = `{
                 "ErrUserNotFound",
                 "ErrUserExists",
                 "ErrWrongCredentials",
-                "ErrTooManyLoginFails",
-                "ErrWalletNotFound"
+                "ErrTooManyLoginFails"
             ]
         }
     },

@@ -25,7 +25,7 @@ import (
 // 登入流程對 cache 的每一步互動（查失敗計數、記失敗、清計數、寫 session）
 // 都是業務邏輯的一部分，mock 的 Times(n) 能逐一驗證。
 func TestLoginAPI(t *testing.T) {
-	user, password := testUser(t)
+	user, password := testAdminUser(t)
 
 	testCases := []struct {
 		name          string
@@ -46,7 +46,7 @@ func TestLoginAPI(t *testing.T) {
 					Times(1).
 					Return("", cache.ErrNotFound)
 				store.EXPECT().
-					GetUserByUsername(gomock.Any(), gomock.Eq(user.Username)).
+					GetAdminUserByUsername(gomock.Any(), gomock.Eq(user.Username)).
 					Times(1).
 					Return(user, nil)
 				// 登入成功：清除失敗計數 + 寫入 session
@@ -70,7 +70,7 @@ func TestLoginAPI(t *testing.T) {
 				var got loginResponse
 				require.Equal(t, errcode.Success, parseResponse(t, recorder.Body, &got))
 				require.NotEmpty(t, got.Token)
-				require.Equal(t, newUserResponse(user), got.User)
+				require.Equal(t, newAdminUserResponse(user), got.User)
 			},
 		},
 		{
@@ -85,9 +85,9 @@ func TestLoginAPI(t *testing.T) {
 					Times(1).
 					Return("", cache.ErrNotFound)
 				store.EXPECT().
-					GetUserByUsername(gomock.Any(), gomock.Eq(user.Username)).
+					GetAdminUserByUsername(gomock.Any(), gomock.Eq(user.Username)).
 					Times(1).
-					Return(db.User{}, sql.ErrNoRows)
+					Return(db.AdminUser{}, sql.ErrNoRows)
 				// 帳號不存在也要記一次失敗——跟密碼錯誤走同一條路，
 				// 避免撞庫時從行為差異洩漏帳號是否存在
 				cacheMock.EXPECT().
@@ -117,7 +117,7 @@ func TestLoginAPI(t *testing.T) {
 					Return("", cache.ErrNotFound)
 				// user 存在，但接下來 CheckPassword 會失敗（真的 bcrypt 比對）
 				store.EXPECT().
-					GetUserByUsername(gomock.Any(), gomock.Eq(user.Username)).
+					GetAdminUserByUsername(gomock.Any(), gomock.Eq(user.Username)).
 					Times(1).
 					Return(user, nil)
 				cacheMock.EXPECT().
@@ -147,7 +147,7 @@ func TestLoginAPI(t *testing.T) {
 					Times(1).
 					Return("5", nil)
 				store.EXPECT().
-					GetUserByUsername(gomock.Any(), gomock.Any()).
+					GetAdminUserByUsername(gomock.Any(), gomock.Any()).
 					Times(0)
 				store.EXPECT().
 					CreateOperationLog(gomock.Any(), gomock.Any()).
@@ -184,7 +184,7 @@ func TestLoginAPI(t *testing.T) {
 }
 
 func TestLogoutAPI(t *testing.T) {
-	user, _ := testUser(t)
+	user, _ := testAdminUser(t)
 
 	ctrl := gomock.NewController(t)
 	store := mockdb.NewMockStore(ctrl)
@@ -214,7 +214,7 @@ func TestLogoutAPI(t *testing.T) {
 }
 
 func TestMeAPI(t *testing.T) {
-	user, _ := testUser(t)
+	user, _ := testAdminUser(t)
 
 	ctrl := gomock.NewController(t)
 	store := mockdb.NewMockStore(ctrl)
@@ -237,15 +237,15 @@ func TestMeAPI(t *testing.T) {
 	require.Equal(t, toAuthUser(user), got)
 }
 
-// eqUpdateUserPasswordParams：同 eqCreateUserTxParams 的思路——
+// eqUpdateAdminUserPasswordParams：同 eqCreateUserTxParams 的思路——
 // bcrypt 雜湊無法預測，用 CheckPassword 驗證雜湊來源後再比對其餘欄位。
-type eqUpdateUserPasswordParamsMatcher struct {
+type eqUpdateAdminUserPasswordParamsMatcher struct {
 	userID   int64
 	password string
 }
 
-func (e eqUpdateUserPasswordParamsMatcher) Matches(x any) bool {
-	arg, ok := x.(db.UpdateUserPasswordParams)
+func (e eqUpdateAdminUserPasswordParamsMatcher) Matches(x any) bool {
+	arg, ok := x.(db.UpdateAdminUserPasswordParams)
 	if !ok {
 		return false
 	}
@@ -255,16 +255,16 @@ func (e eqUpdateUserPasswordParamsMatcher) Matches(x any) bool {
 	return util.CheckPassword(e.password, arg.HashedPassword) == nil
 }
 
-func (e eqUpdateUserPasswordParamsMatcher) String() string {
+func (e eqUpdateAdminUserPasswordParamsMatcher) String() string {
 	return fmt.Sprintf("matches user id %d and new password %v", e.userID, e.password)
 }
 
-func eqUpdateUserPasswordParams(userID int64, password string) gomock.Matcher {
-	return eqUpdateUserPasswordParamsMatcher{userID: userID, password: password}
+func eqUpdateAdminUserPasswordParams(userID int64, password string) gomock.Matcher {
+	return eqUpdateAdminUserPasswordParamsMatcher{userID: userID, password: password}
 }
 
 func TestChangePasswordAPI(t *testing.T) {
-	user, password := testUser(t)
+	user, password := testAdminUser(t)
 	newPassword := "newsecret456"
 
 	testCases := []struct {
@@ -278,11 +278,11 @@ func TestChangePasswordAPI(t *testing.T) {
 			body: gin.H{"old_password": password, "new_password": newPassword},
 			buildStubs: func(store *mockdb.MockStore, cacheMock *mockcache.MockCache) {
 				store.EXPECT().
-					GetUser(gomock.Any(), gomock.Eq(user.ID)).
+					GetAdminUser(gomock.Any(), gomock.Eq(user.ID)).
 					Times(1).
 					Return(user, nil)
 				store.EXPECT().
-					UpdateUserPassword(gomock.Any(), eqUpdateUserPasswordParams(user.ID, newPassword)).
+					UpdateAdminUserPassword(gomock.Any(), eqUpdateAdminUserPasswordParams(user.ID, newPassword)).
 					Times(1).
 					Return(nil)
 				// 改完密碼刪掉目前的 session，強制重新登入
@@ -305,11 +305,11 @@ func TestChangePasswordAPI(t *testing.T) {
 			body: gin.H{"old_password": "wrong-password", "new_password": newPassword},
 			buildStubs: func(store *mockdb.MockStore, cacheMock *mockcache.MockCache) {
 				store.EXPECT().
-					GetUser(gomock.Any(), gomock.Eq(user.ID)).
+					GetAdminUser(gomock.Any(), gomock.Eq(user.ID)).
 					Times(1).
 					Return(user, nil)
 				// 舊密碼錯：不能改密碼、不能動 session
-				store.EXPECT().UpdateUserPassword(gomock.Any(), gomock.Any()).Times(0)
+				store.EXPECT().UpdateAdminUserPassword(gomock.Any(), gomock.Any()).Times(0)
 				cacheMock.EXPECT().Del(gomock.Any(), gomock.Any()).Times(0)
 				store.EXPECT().
 					CreateOperationLog(gomock.Any(), gomock.Any()).
@@ -326,7 +326,7 @@ func TestChangePasswordAPI(t *testing.T) {
 			body: gin.H{"old_password": password, "new_password": "123"},
 			buildStubs: func(store *mockdb.MockStore, cacheMock *mockcache.MockCache) {
 				// 參數驗證失敗就不該碰 DB
-				store.EXPECT().GetUser(gomock.Any(), gomock.Any()).Times(0)
+				store.EXPECT().GetAdminUser(gomock.Any(), gomock.Any()).Times(0)
 				store.EXPECT().
 					CreateOperationLog(gomock.Any(), gomock.Any()).
 					Times(1).
@@ -342,11 +342,11 @@ func TestChangePasswordAPI(t *testing.T) {
 			body: gin.H{"old_password": password, "new_password": newPassword},
 			buildStubs: func(store *mockdb.MockStore, cacheMock *mockcache.MockCache) {
 				store.EXPECT().
-					GetUser(gomock.Any(), gomock.Eq(user.ID)).
+					GetAdminUser(gomock.Any(), gomock.Eq(user.ID)).
 					Times(1).
 					Return(user, nil)
 				store.EXPECT().
-					UpdateUserPassword(gomock.Any(), gomock.Any()).
+					UpdateAdminUserPassword(gomock.Any(), gomock.Any()).
 					Times(1).
 					Return(errors.New("db is down"))
 				// 密碼沒改成，session 不能動

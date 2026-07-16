@@ -1,35 +1,57 @@
 package api
 
 import (
-	"database/sql"
-	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	db "github.com/kys20548/template_golang_web/db/sqlc"
 	"github.com/kys20548/template_golang_web/errcode"
 )
 
-// getMyWallet 查詢登入者自己的錢包：user 來源是驗證層放入 context 的
-// AuthUser，而不是 request 參數，client 無法指定查別人的錢包。
+type listWalletsRequest struct {
+	PageNum  int32 `form:"pageNum" binding:"required,min=1"`
+	PageSize int32 `form:"pageSize" binding:"required,min=5,max=50"`
+}
+
+// listWallets 分頁查詢所有前台 user 的錢包（join users 帶出帳號資訊），
+// 供後台檢視；wallets 與前台 users 一對一，後台 user 沒有錢包。
 //
-// @Summary  查詢自己的錢包
+// @Summary  錢包列表（前台 user）
 // @Tags     wallet
 // @Produce  json
 // @Security TokenAuth
-// @Success  200 {object} Response{data=db.Wallet}
-// @Router   /wallet [get]
-func (server *Server) getMyWallet(ctx *gin.Context) {
-	user := getAuthUser(ctx)
+// @Param    pageNum  query int true "頁碼（從 1 開始）"
+// @Param    pageSize query int true "每頁筆數（5-50）"
+// @Success  200 {object} Response{data=PageResult{list=[]db.ListWalletsRow}}
+// @Router   /wallets [get]
+func (server *Server) listWallets(ctx *gin.Context) {
+	var req listWalletsRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		fail(ctx, http.StatusBadRequest, errcode.ErrInvalidParams, err)
+		return
+	}
 
-	wallet, err := server.store.GetWalletByUserID(ctx, user.UserID)
+	arg := db.ListWalletsParams{
+		Limit:  req.PageSize,
+		Offset: (req.PageNum - 1) * req.PageSize,
+	}
+
+	wallets, err := server.store.ListWallets(ctx, arg)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			fail(ctx, http.StatusNotFound, errcode.ErrWalletNotFound, nil)
-			return
-		}
 		failInternal(ctx, err)
 		return
 	}
 
-	ok(ctx, wallet)
+	total, err := server.store.CountWallets(ctx)
+	if err != nil {
+		failInternal(ctx, err)
+		return
+	}
+
+	ok(ctx, PageResult{
+		PageNum:  req.PageNum,
+		PageSize: req.PageSize,
+		Total:    total,
+		List:     wallets,
+	})
 }

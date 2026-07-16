@@ -9,6 +9,13 @@ import (
 	"time"
 )
 
+type AdminUser struct {
+	ID             int64     `json:"id"`
+	Username       string    `json:"username"`
+	HashedPassword string    `json:"hashed_password"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
 type OperationLog struct {
 	ID          int64         `json:"id"`
 	UserID      sql.NullInt64 `json:"user_id"`

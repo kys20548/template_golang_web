@@ -7,7 +7,19 @@ package db
 
 import (
 	"context"
+	"time"
 )
+
+const countWallets = `-- name: CountWallets :one
+SELECT count(*) FROM wallets
+`
+
+func (q *Queries) CountWallets(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countWallets)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
 
 const createWallet = `-- name: CreateWallet :one
 INSERT INTO wallets (
@@ -29,19 +41,55 @@ func (q *Queries) CreateWallet(ctx context.Context, userID int64) (Wallet, error
 	return i, err
 }
 
-const getWalletByUserID = `-- name: GetWalletByUserID :one
-SELECT id, user_id, balance, created_at FROM wallets
-WHERE user_id = $1 LIMIT 1
+const listWallets = `-- name: ListWallets :many
+SELECT w.id, w.user_id, u.username, u.email, w.balance, w.created_at
+FROM wallets w
+JOIN users u ON u.id = w.user_id
+ORDER BY w.id
+LIMIT $1
+OFFSET $2
 `
 
-func (q *Queries) GetWalletByUserID(ctx context.Context, userID int64) (Wallet, error) {
-	row := q.db.QueryRowContext(ctx, getWalletByUserID, userID)
-	var i Wallet
-	err := row.Scan(
-		&i.ID,
-		&i.UserID,
-		&i.Balance,
-		&i.CreatedAt,
-	)
-	return i, err
+type ListWalletsParams struct {
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+}
+
+type ListWalletsRow struct {
+	ID        int64     `json:"id"`
+	UserID    int64     `json:"user_id"`
+	Username  string    `json:"username"`
+	Email     string    `json:"email"`
+	Balance   int64     `json:"balance"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func (q *Queries) ListWallets(ctx context.Context, arg ListWalletsParams) ([]ListWalletsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listWallets, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListWalletsRow{}
+	for rows.Next() {
+		var i ListWalletsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Username,
+			&i.Email,
+			&i.Balance,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

@@ -10,18 +10,24 @@ import (
 )
 
 type Querier interface {
+	CountAdminUsers(ctx context.Context) (int64, error)
 	CountOperationLogs(ctx context.Context) (int64, error)
 	CountUsers(ctx context.Context) (int64, error)
+	CountWallets(ctx context.Context) (int64, error)
 	CreateOperationLog(ctx context.Context, arg CreateOperationLogParams) (OperationLog, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateWallet(ctx context.Context, userID int64) (Wallet, error)
 	DeleteOperationLogsBefore(ctx context.Context, createdAt time.Time) (int64, error)
 	DeleteUser(ctx context.Context, id int64) error
+	GetAdminUser(ctx context.Context, id int64) (AdminUser, error)
+	GetAdminUserByUsername(ctx context.Context, username string) (AdminUser, error)
 	GetUser(ctx context.Context, id int64) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
-	GetWalletByUserID(ctx context.Context, userID int64) (Wallet, error)
+	ListAdminUsers(ctx context.Context, arg ListAdminUsersParams) ([]AdminUser, error)
 	ListOperationLogs(ctx context.Context, arg ListOperationLogsParams) ([]OperationLog, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
+	ListWallets(ctx context.Context, arg ListWalletsParams) ([]ListWalletsRow, error)
+	UpdateAdminUserPassword(ctx context.Context, arg UpdateAdminUserPasswordParams) error
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
 }
 

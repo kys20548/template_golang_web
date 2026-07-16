@@ -4,7 +4,8 @@ import AppShell from '../components/AppShell.vue'
 import LoginView from '../views/LoginView.vue'
 import DashboardView from '../views/DashboardView.vue'
 import UsersView from '../views/UsersView.vue'
-import WalletView from '../views/WalletView.vue'
+import AdminUsersView from '../views/AdminUsersView.vue'
+import WalletsView from '../views/WalletsView.vue'
 import OperationLogsView from '../views/OperationLogsView.vue'
 import ChangePasswordView from '../views/ChangePasswordView.vue'
 
@@ -20,7 +21,8 @@ const router = createRouter({
         { path: '', redirect: 'dashboard' },
         { path: 'dashboard', component: DashboardView },
         { path: 'users', component: UsersView },
-        { path: 'wallet', component: WalletView },
+        { path: 'admin-users', component: AdminUsersView },
+        { path: 'wallets', component: WalletsView },
         { path: 'operation-logs', component: OperationLogsView },
         { path: 'me/password', component: ChangePasswordView },
       ],

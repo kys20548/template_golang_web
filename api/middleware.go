@@ -32,11 +32,10 @@ const (
 	requestIDKey = "request_id"
 )
 
-// AuthUser 為登入者資訊，驗證通過後放入 context 供後續邏輯使用。
+// AuthUser 為登入者（後台 user）資訊，驗證通過後放入 context 供後續邏輯使用。
 type AuthUser struct {
 	UserID   int64  `json:"user_id"`
 	Username string `json:"username"`
-	Email    string `json:"email"`
 }
 
 func sessionKey(token string) string {

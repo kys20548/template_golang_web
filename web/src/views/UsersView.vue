@@ -50,7 +50,7 @@ function clearLookup() {
 </script>
 
 <template>
-  <h1>使用者</h1>
+  <h1>前台使用者</h1>
 
   <div class="toolbar">
     <div class="field">

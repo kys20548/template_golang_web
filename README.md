@@ -6,7 +6,8 @@ Golang Web 專案模板：**gin + viper + sqlc + PostgreSQL + Redis + asynq**。
 
 - **統一回應格式** `{code, msg, data}`，業務狀態碼集中在 `errcode/` 管理
 - **Token 驗證層**：Redis session、bcrypt 密碼、登入失敗鎖定、即時登出、
-  sliding TTL（活躍自動續期）、改密碼強制重新登入
+  sliding TTL（活躍自動續期）、改密碼強制重新登入；前台/後台 user 分離，
+  登入者一律是後台 user（`admin_users`）
 - **可觀測性**：Request ID 貫穿鏈路（zerolog）、操作日誌（audit log）、統一 panic 回應
 - **API 超時控制**：全域硬超時真正取消 DB/Redis 操作 + 個別路由慢請求 log
 - **排程與背景任務**：asynq scheduler 到點 enqueue、worker 執行，多 instance 以 `asynq.Unique` 去重
@@ -14,7 +15,7 @@ Golang Web 專案模板：**gin + viper + sqlc + PostgreSQL + Redis + asynq**。
 - **Swagger 文件**（development 環境 `/swagger/index.html`）、DB 連線池、CORS、graceful shutdown
 - **Dockerfile（multi-stage，約 84MB）+ GitHub Actions CI**：image 內建 `migrate` CLI，
   容器啟動時（`entrypoint.sh`）自動跑 migration 才啟動服務，migration 失敗容器直接掛掉
-- **Vue 後台前端**（`web/`）：登入、使用者查詢、錢包、操作日誌、修改密碼，
+- **Vue 後台前端**（`web/`）：登入、前台/後台使用者查詢、錢包列表、操作日誌、修改密碼，
   可獨立部署成 Render Static Site，詳見 [web/README.md](web/README.md)
 
 設計理由與實作細節見 **[NOTES.md 設計筆記](NOTES.md)**。
@@ -74,22 +75,27 @@ docker run -p 8080:8080 \
 ```bash
 # 公開路由
 curl http://localhost:8080/healthz
-curl -X POST http://localhost:8080/users -d '{"username":"danny","email":"danny@example.com","password":"secret123"}'
-curl -X POST http://localhost:8080/login -d '{"username":"danny","password":"secret123"}'
+curl -X POST http://localhost:8080/users -d '{"username":"danny","email":"danny@example.com","password":"secret123"}'  # 建立前台 user + 錢包
+curl -X POST http://localhost:8080/login -d '{"username":"admin","password":"admin123"}'  # 後台 user 登入（migration 種子帳號，部署後請改密碼）
 
-# 需驗證的路由（header 帶 token）
+# 需驗證的路由（header 帶 token，登入者一律是後台 user）
 curl -H "token: <token>" http://localhost:8080/me
-curl -X PUT -H "token: <token>" http://localhost:8080/me/password -d '{"old_password":"secret123","new_password":"newsecret456"}'  # 成功後需重新登入
-curl -H "token: <token>" http://localhost:8080/wallet   # 查登入者自己的錢包（user 來自 context）
-curl -H "token: <token>" http://localhost:8080/users/1
-curl -H "token: <token>" 'http://localhost:8080/users?pageNum=1&pageSize=5'
+curl -X PUT -H "token: <token>" http://localhost:8080/me/password -d '{"old_password":"admin123","new_password":"newsecret456"}'  # 成功後需重新登入
+curl -H "token: <token>" 'http://localhost:8080/wallets?pageNum=1&pageSize=10'      # 所有前台 user 的錢包
+curl -H "token: <token>" http://localhost:8080/users/1                              # 前台 user
+curl -H "token: <token>" 'http://localhost:8080/users?pageNum=1&pageSize=5'         # 前台 user 列表
+curl -H "token: <token>" 'http://localhost:8080/admin-users?pageNum=1&pageSize=10'  # 後台 user 列表
 ```
 
 ## Roadmap（尚未實作）
 
-- [x] **後台管理頁面**（`web/`）：sidebar 版型 + 使用者列表/依 ID 查詢
-      （`GET /users`、`GET /users/{id}`，分頁）、錢包資訊（`GET /wallet`）、
+- [x] **後台管理頁面**（`web/`）：sidebar 版型 + 前台使用者列表/依 ID 查詢
+      （`GET /users`、`GET /users/{id}`，分頁）、後台使用者列表（`GET /admin-users`，分頁）、
+      前台使用者錢包列表（`GET /wallets`，分頁）、
       operation log 列表（`GET /operation-logs`，分頁）、改密碼（`PUT /me/password`）
+- [x] **前台/後台 user 分離** — 本專案定位是後台系統：`admin_users` 表（登入、改密碼、
+      session 都走它，migration 含種子帳號 admin/admin123）；`users` 表為前台 user
+      （公開註冊 + 錢包），後台只做查詢
 - [ ] **RBAC 權限控制** — roles / permissions / user_roles 表 + `permMiddleware("user:delete")`
       權限中介層；權限清單登入時放進 Redis session。開工前先對齊既有 Java 系統的權限表結構
 - [x] **`/readyz` readiness 端點** — ping DB/Redis，給 LB / ASG(ELB health check) /
