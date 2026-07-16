@@ -247,17 +247,91 @@ main goroutine 阻塞等待 `SIGINT` / `SIGTERM`，收到訊號後呼叫
 ## Docker 與 CI
 
 **Dockerfile**（multi-stage）：builder 層用完整 Go 工具鏈編譯靜態執行檔，
-最終 image 只有 alpine + 執行檔 + app.env（約 70MB）。兩個細節：
+最終 image 是 alpine + 執行檔 + `migrate` CLI + migration SQL + app.env（約 84MB）。幾個細節：
 
 - 有裝 `tzdata`，但 **image 不自己設 TZ**——時區以部署環境注入的 `TZ` 環境變數為準
   （一般原則：跟部署機器走，程式不要自作主張）。沒注入 TZ 時容器跑 UTC，
   scheduler 的 cron「凌晨」就是 UTC 半夜，部署時要注意
 - image 內的 `app.env` 只是讓 viper 能啟動的底，實際部署用環境變數覆蓋
+- `migrate` CLI 只裝 `postgres` build tag（`go install -tags 'postgres' .../migrate/cmd/migrate`），
+  避免拉進用不到、需要 cgo 的 driver（如 sqlite）
 
-migration 不在 image 裡執行，部署時另外跑 `migrate` CLI（或 CI/CD pipeline 的獨立步驟）。
+**migration 隨容器啟動自動跑**（`entrypoint.sh`）：
+
+```sh
+migrate -path db/migration -database "$DB_SOURCE" -verbose up
+exec /app/main
+```
+
+`set -e` 讓 migration 失敗時容器直接以非零 exit code 掛掉，**不會拿舊 schema 硬起服務**
+——本機用 `docker run` 測過密碼錯誤的情境，容器確實不會啟動 HTTP server。
+之所以不用「部署平台的 pre-deploy hook」統一處理：Render Free 方案的 **Pre-Deploy Command
+是鎖住的付費功能**（欄位打不進字，跟 Shell 存取一樣），改把 migration 收進 entrypoint 是
+免費方案也能用、且到哪個平台部署都一致的做法。`make migrateup` 仍保留給本機開發用。
 
 **CI**（`.github/workflows/ci.yml`）：push / PR 觸發，跑 `go build` → `go vet` →
 `go test`（全 mock，不需 DB/Redis service），過了再驗證 docker image 蓋得起來。
+**這條 pipeline 不負責部署**——實際部署是 Render 自己連 GitHub webhook 做的
+（Auto-Deploy: On Commit），跟 GitHub Actions 是兩條互不相干的路徑，這也是
+migration 選擇收進 image/entrypoint、而不是加一個 GitHub Actions deploy 步驟的原因
+（順序對不上，两邊各跑各的無法保證先後）。
+
+## Render 部署
+
+Demo 用四個 Render 資源：`template_postgres`（PostgreSQL 18）、`template_redis`
+（Valkey，Render 的 Key Value 服務）、`template_golang_web`（Web Service，Docker
+runtime）、`template_golang_web_frontend`（Static Site，`web/`）。都是手動在
+dashboard 建立，沒有用 render.yaml。
+
+**Free 方案的坑**（都是實測發現，不是文件寫的）：
+
+- **Postgres 免費方案 30 天到期**會被刪除，不是永久免費，dashboard 會顯示到期日
+- **Redis/Key Value 免費方案沒有到期限制**，25MB RAM，maxmemory policy 預設
+  `allkeys-lru`（滿了會淘汰最少用的 key，不管 TTL 到了沒），demo 規模不會踩到
+- **Pre-Deploy Command 是付費方案才開放的功能**，Free 方案這欄位鎖住打不進字
+  （跟 Shell 存取一樣），migration 因此改用 entrypoint.sh 的做法（見上一節）
+- **Static Site 不支援 Netlify 風格的 `_redirects` 檔案**，SPA 的 rewrite 要在
+  Render 的 **Redirects/Rewrites** 頁面手動加規則：Source `/*`、Destination
+  `/index.html`、Action 選 **Rewrite（200）**不是 Redirect（301）——選錯的話
+  瀏覽器網址列會被跳掉，且該分頁的 Action 下拉是原生 `<select>`，UI 自動化下
+  用鍵盤選值不一定生效，要用 JS 直接設 `value` 再 dispatch change 事件才可靠
+- 外部連線（本機 DBeaver / Redis client 接 Render 的 DB）都要注意：
+  - Postgres 用 **External Database URL**（Internal URL 只有 Render 內網服務能連）
+  - DBeaver 的「Connect by: URL」只吃 JDBC 格式，Render 給的是 libpq 風格
+    `postgresql://user:pass@host/db`，貼進去會報 `Invalid JDBC URL`——改用
+    「Connect by: Host」分欄位填，並在 SSL 分頁把 SSL Mode 設成 `require`
+  - Redis 的 External Key Value URL 是 `rediss://`（要 TLS），一般 Redis GUI
+    client 要另外開 SSL/TLS 選項才連得上
+
+**Monorepo 部署設定**：Go 和 Vue 在同一個 repo，兩個 Render service 各自設
+Root Directory（Go 用 repo 根目錄、Vue 用 `web`）+ Build Filters（Go 的
+Ignored Paths、Vue 的 Included Paths 都設 `web/**`），避免只改一邊卻兩個
+service 都重建。根目錄 `.dockerignore` 也要排除 `/web`，否則 Go 的 Docker
+build context 會把前端整包一起複製進去。
+
+**CORS**：起步先用 `CORS_ALLOW_ORIGINS=*` 打通，前端網域確定後收斂成實際網域；
+這個 API 是用自訂 `token` header 而非 cookie 做驗證，`*` 不會有 credentials-mode
+的瀏覽器限制（`AllowCredentials` 本來就沒開），收斂單純是縮小暴露面。
+
+**`ENVIRONMENT`**：Render 上要記得設成非 `development` 的值（如 `production`），
+否則會跑 gin debug mode（印一長串路由註冊 log）且 `/swagger/*any` 會公開暴露，
+見上面「驗證層」外的 `api/server.go` 環境判斷。
+
+## Vue 前端（`web/`）
+
+第一輪刻意只做骨架驗證整條路徑：登入頁打 `POST /login`，dashboard 用
+`GET /me` 證明 token 驗證全程有效，再加登出——同時把 CORS、header-based auth、
+統一回應 envelope 解析都走一遍，之後加其他後台頁面是重複同個 pattern。
+
+技術選型：Vue 3 + Vite + 純 JS，不加 TypeScript / Pinia / UI 框架（目前只有
+兩頁，規模用不到，YAGNI；頁面數量真的變多再評估要不要加狀態管理）。
+
+- `src/api/client.js`：`fetch` 包裝，自動帶 `token` header（從
+  `auth/session.js` 讀），base URL 讀 `import.meta.env.VITE_API_BASE_URL`，
+  解 `{code,msg,data}` envelope，`code !== 0` 就 throw 帶上 `msg`
+- `src/auth/session.js`：token/user 存 localStorage 的封裝，不用 Pinia
+- `src/router/index.js`：`beforeEach` 守衛，`meta.requiresAuth` 的路由沒有
+  token 就導回 `/login`
 
 ## 測試
 

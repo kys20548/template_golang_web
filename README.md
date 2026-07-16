@@ -12,7 +12,10 @@ Golang Web 專案模板：**gin + viper + sqlc + PostgreSQL + Redis + asynq**。
 - **排程與背景任務**：asynq scheduler 到點 enqueue、worker 執行，多 instance 以 `asynq.Unique` 去重
 - **測試基礎設施**：mockgen + table-driven handler 測試，不需真實 DB/Redis
 - **Swagger 文件**（development 環境 `/swagger/index.html`）、DB 連線池、CORS、graceful shutdown
-- **Dockerfile（multi-stage，約 70MB）+ GitHub Actions CI**
+- **Dockerfile（multi-stage，約 84MB）+ GitHub Actions CI**：image 內建 `migrate` CLI，
+  容器啟動時（`entrypoint.sh`）自動跑 migration 才啟動服務，migration 失敗容器直接掛掉
+- **Vue 前端骨架**（`web/`）：登入 + dashboard，可獨立部署成 Render Static Site，
+  詳見 [web/README.md](web/README.md)
 
 設計理由與實作細節見 **[NOTES.md 設計筆記](NOTES.md)**。
 
@@ -33,7 +36,9 @@ Golang Web 專案模板：**gin + viper + sqlc + PostgreSQL + Redis + asynq**。
 │   ├── sqlc/            # sqlc 產生的程式碼 + Store interface
 │   └── mock/            # mockgen 產生的 Store mock（make mock 重新生成）
 ├── scheduler/           # asynq 排程與背景任務（cron enqueue + worker 執行）
-└── util/                # 設定載入等工具
+├── util/                # 設定載入等工具
+├── web/                 # Vue 3 前端骨架（登入 + dashboard），獨立部署見 web/README.md
+└── entrypoint.sh        # Docker 容器進入點：先跑 migration 再啟動 main
 ```
 
 ## 快速開始
@@ -82,6 +87,9 @@ curl -H "token: <token>" 'http://localhost:8080/users?pageNum=1&pageSize=5'
 
 ## Roadmap（尚未實作）
 
+- [ ] **後台管理頁面**（`web/`，目前只有登入 + 空白 dashboard）：
+      使用者列表/查詢（`GET /users`，分頁）、錢包資訊（`GET /wallet`）、
+      operation log 列表（`GET /operation-logs`，分頁）、改密碼（`PUT /me/password`）
 - [ ] **RBAC 權限控制** — roles / permissions / user_roles 表 + `permMiddleware("user:delete")`
       權限中介層；權限清單登入時放進 Redis session。開工前先對齊既有 Java 系統的權限表結構
 - [x] **`/readyz` readiness 端點** — ping DB/Redis，給 LB / ASG(ELB health check) /
@@ -89,10 +97,13 @@ curl -H "token: <token>" 'http://localhost:8080/users?pageNum=1&pageSize=5'
 - [x] **Session 補完** — sliding TTL（活躍使用者自動續期，不會用到一半被登出）+
       `PUT /me/password` 改密碼（刪除目前 session 強制重登；單一 session key 設計，
       不做反查索引，取捨見 NOTES「驗證層」）
+- [x] **Render 部署 demo**（Postgres + Redis + Web Service + Static Site）
+      — migration 隨容器啟動自動跑、CORS 收斂、production 模式；細節與免費方案的
+      限制（Postgres 30 天到期、Pre-Deploy Command 鎖付費方案）見 NOTES「Render 部署」
 - [ ] **kafka** — 有實際場景再加；原則：獨立 goroutine 執行、
       掛掉只記 log 不拖垮 HTTP server，graceful shutdown 時一併優雅關閉
 
 明確不做（模板定位是 code，運維交給部署方）：log 收集/alerting、secrets 管理、
-`/metrics`、壓測、SQL migration 的部署編排。
+`/metrics`、壓測。
 
 已完成項目的演進紀錄與設計細節見 [NOTES.md](NOTES.md)。
