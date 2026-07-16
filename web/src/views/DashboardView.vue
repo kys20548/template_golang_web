@@ -1,35 +1,31 @@
 <script setup>
-import { onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { request } from '../api/client'
-import { clearSession } from '../auth/session'
+import { inject } from 'vue'
 
-const user = ref(null)
-const error = ref('')
-const router = useRouter()
-
-onMounted(async () => {
-  try {
-    user.value = await request('/me')
-  } catch (e) {
-    error.value = e.message
-  }
-})
-
-async function onLogout() {
-  try {
-    await request('/logout', { method: 'POST' })
-  } finally {
-    clearSession()
-    router.push('/login')
-  }
-}
+const user = inject('authUser')
 </script>
 
 <template>
-  <h1>後台首頁</h1>
-  <p v-if="error" role="alert">{{ error }}</p>
-  <p v-else-if="user">已登入：{{ user.username }}</p>
-  <p v-else>載入中…</p>
-  <button @click="onLogout">登出</button>
+  <h1>首頁</h1>
+  <p class="muted" v-if="user">
+    歡迎回來，<strong>{{ user.username }}</strong>。
+  </p>
+
+  <div class="card-grid">
+    <router-link to="/users" class="card">
+      <div class="stat-label">使用者</div>
+      <p class="muted" style="margin: 0">查詢帳號、瀏覽分頁列表</p>
+    </router-link>
+    <router-link to="/wallet" class="card">
+      <div class="stat-label">我的錢包</div>
+      <p class="muted" style="margin: 0">查看目前餘額</p>
+    </router-link>
+    <router-link to="/operation-logs" class="card">
+      <div class="stat-label">操作日誌</div>
+      <p class="muted" style="margin: 0">追蹤誰在什麼時候改了什麼</p>
+    </router-link>
+    <router-link to="/me/password" class="card">
+      <div class="stat-label">修改密碼</div>
+      <p class="muted" style="margin: 0">變更後需要重新登入</p>
+    </router-link>
+  </div>
 </template>

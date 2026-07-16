@@ -1,7 +1,8 @@
-# 後台前端（骨架）
+# 後台前端
 
-Vue 3 + Vite + Vue Router，純 JS（不含 TypeScript / Pinia / UI 框架——目前只有
-登入頁 + 空白 dashboard，規模用不到，之後頁面變多再評估要不要加）。
+Vue 3 + Vite + Vue Router，純 JS（不含 TypeScript / Pinia / UI 框架，規模用不到，
+之後頁面變多再評估要不要加）。登入後為 sidebar + 內容區的後台版型，涵蓋使用者查詢、
+錢包餘額、操作日誌、修改密碼。
 
 對接的後端 API 見專案根目錄 [README](../README.md) 與 [NOTES.md](../NOTES.md)。
 
@@ -19,8 +20,17 @@ npm run build    # 輸出到 dist/
 src/
   api/client.js     # fetch 包裝：帶 token header、解 {code,msg,data} envelope
   auth/session.js   # token/user 存取（localStorage）
-  router/index.js   # /login, /dashboard 路由 + 未登入導向 /login 的守衛
-  views/            # LoginView、DashboardView
+  router/index.js   # /login + AppShell 底下的巢狀路由，未登入導向 /login 的守衛
+  components/
+    AppShell.vue      # 登入後的版型：sidebar 導覽 + topbar（使用者 + 登出）
+    Pagination.vue    # 分頁列表共用的上一頁/下一頁元件
+  views/
+    LoginView.vue          # 登入
+    DashboardView.vue      # 首頁：快捷入口卡片
+    UsersView.vue          # 使用者分頁列表 + 依 ID 查詢
+    WalletView.vue         # 自己的錢包餘額
+    OperationLogsView.vue  # 操作日誌分頁列表
+    ChangePasswordView.vue # 修改密碼（成功後導回登入頁）
 ```
 
 ## 部署（Render Static Site）

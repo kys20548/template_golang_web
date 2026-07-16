@@ -14,8 +14,8 @@ Golang Web 專案模板：**gin + viper + sqlc + PostgreSQL + Redis + asynq**。
 - **Swagger 文件**（development 環境 `/swagger/index.html`）、DB 連線池、CORS、graceful shutdown
 - **Dockerfile（multi-stage，約 84MB）+ GitHub Actions CI**：image 內建 `migrate` CLI，
   容器啟動時（`entrypoint.sh`）自動跑 migration 才啟動服務，migration 失敗容器直接掛掉
-- **Vue 前端骨架**（`web/`）：登入 + dashboard，可獨立部署成 Render Static Site，
-  詳見 [web/README.md](web/README.md)
+- **Vue 後台前端**（`web/`）：登入、使用者查詢、錢包、操作日誌、修改密碼，
+  可獨立部署成 Render Static Site，詳見 [web/README.md](web/README.md)
 
 設計理由與實作細節見 **[NOTES.md 設計筆記](NOTES.md)**。
 
@@ -37,7 +37,7 @@ Golang Web 專案模板：**gin + viper + sqlc + PostgreSQL + Redis + asynq**。
 │   └── mock/            # mockgen 產生的 Store mock（make mock 重新生成）
 ├── scheduler/           # asynq 排程與背景任務（cron enqueue + worker 執行）
 ├── util/                # 設定載入等工具
-├── web/                 # Vue 3 前端骨架（登入 + dashboard），獨立部署見 web/README.md
+├── web/                 # Vue 3 後台前端，獨立部署見 web/README.md
 └── entrypoint.sh        # Docker 容器進入點：先跑 migration 再啟動 main
 ```
 
@@ -87,8 +87,8 @@ curl -H "token: <token>" 'http://localhost:8080/users?pageNum=1&pageSize=5'
 
 ## Roadmap（尚未實作）
 
-- [ ] **後台管理頁面**（`web/`，目前只有登入 + 空白 dashboard）：
-      使用者列表/查詢（`GET /users`，分頁）、錢包資訊（`GET /wallet`）、
+- [x] **後台管理頁面**（`web/`）：sidebar 版型 + 使用者列表/依 ID 查詢
+      （`GET /users`、`GET /users/{id}`，分頁）、錢包資訊（`GET /wallet`）、
       operation log 列表（`GET /operation-logs`，分頁）、改密碼（`PUT /me/password`）
 - [ ] **RBAC 權限控制** — roles / permissions / user_roles 表 + `permMiddleware("user:delete")`
       權限中介層；權限清單登入時放進 Redis session。開工前先對齊既有 Java 系統的權限表結構
