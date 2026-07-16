@@ -1,0 +1,14 @@
+:root {
+  color-scheme: light dark;
+  font: 16px/1.5 system-ui, 'Segoe UI', Roboto, sans-serif;
+}
+
+body {
+  margin: 0;
+}
+
+#app {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 48px 20px;
+}
