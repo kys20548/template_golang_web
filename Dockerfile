@@ -10,7 +10,7 @@ COPY . .
 # CGO_ENABLED=0 產出靜態執行檔（alpine 沒有 glibc）；-s -w 去掉符號表縮小體積
 RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o main .
 # migrate CLI 只裝 postgres tag，避免拉進用不到、需要 cgo 的 driver（如 sqlite）；
-# 給 Render Pre-Deploy Command 用，部署新版本前先跑 migration
+# entrypoint.sh 會在容器啟動時用它先跑 migration（Free tier 沒有 Pre-Deploy Command）
 RUN CGO_ENABLED=0 go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 
 # Run stage：只放執行檔 + 設定檔
@@ -28,6 +28,8 @@ COPY --from=builder /go/bin/migrate /usr/local/bin/migrate
 COPY db/migration ./db/migration
 # viper 要求 app.env 存在才能啟動；實際部署用環境變數覆蓋其中的值
 COPY app.env .
+COPY entrypoint.sh .
+RUN chmod +x entrypoint.sh
 
 EXPOSE 8080
-ENTRYPOINT ["/app/main"]
+ENTRYPOINT ["./entrypoint.sh"]
