@@ -1,48 +1,60 @@
 # template_golang_web
 
-Golang Web 專案模板：**gin + viper + sqlc + PostgreSQL + Redis + asynq**。
+**Go 後台管理系統模板**——可以直接長出新後台專案的骨架：
+驗證、RBAC 權限、操作稽核、排程任務、測試與部署配置都已就位，
+附一套接好權限的 Vue 後台介面。
 
-## 功能特色
+> 後端 **gin + viper + sqlc + PostgreSQL + Redis + asynq**，前端 **Vue 3 + Vite**。
 
-- **統一回應格式** `{code, msg, data}`，業務狀態碼集中在 `errcode/` 管理
-- **Token 驗證層**：Redis session + 反查索引（一人一 session，重複登入踢舊裝置）、
-  bcrypt 密碼、登入失敗鎖定、即時登出、sliding TTL（活躍自動續期）、
-  改密碼強制重新登入；前台/後台 user 分離，登入者一律是後台 user（`admin_users`）
-- **使用者軟刪除**：前後台 user 皆為 `deleted_at` 軟刪除 + 還原 API，
-  partial unique index 讓同名可重新註冊；刪除後台帳號即時踢下線、不能刪自己
-- **RBAC 權限控制**：角色/權限四表 + `permMiddleware("user:read")` 路由層檢查，
-  權限快照放 session、request 零 DB 查詢；後台可建帳號、指派角色
-- **可觀測性**：Request ID 貫穿鏈路（zerolog）、操作日誌（audit log）、統一 panic 回應
-- **API 超時控制**：全域硬超時真正取消 DB/Redis 操作 + 個別路由慢請求 log
-- **排程與背景任務**：asynq scheduler 到點 enqueue、worker 執行，多 instance 以 `asynq.Unique` 去重
-- **測試基礎設施**：mockgen + table-driven handler 測試，不需真實 DB/Redis
-- **Swagger 文件**（development 環境 `/swagger/index.html`）、DB 連線池、CORS、graceful shutdown
-- **Dockerfile（multi-stage，約 84MB）+ GitHub Actions CI**：image 內建 `migrate` CLI，
-  容器啟動時（`entrypoint.sh`）自動跑 migration 才啟動服務，migration 失敗容器直接掛掉
-- **Vue 後台前端**（`web/`）：登入、前台/後台使用者查詢、錢包列表、操作日誌、修改密碼，
-  可獨立部署成 Render Static Site，詳見 [web/README.md](web/README.md)
+## 功能總覽
 
-設計理由與實作細節見 **[NOTES.md 設計筆記](NOTES.md)**。
+**驗證與權限**
+
+- Token 驗證層：Redis session + 反查索引（一人一 session，重複登入踢舊裝置）、
+  bcrypt 密碼、登入失敗鎖定、sliding TTL 自動續期、改密碼強制重登
+- 前台/後台 user 分離：登入者一律是後台 user（`admin_users`）；
+  前台 user（`users`，公開註冊 + 錢包）只是管理對象
+- RBAC：角色/權限四表 + `permMiddleware("user:read")` 路由層檢查，
+  權限快照放 session、每個 request 零 DB 查詢
+- 使用者軟刪除（前後台）＋還原：partial unique index 讓同名可重新註冊；
+  刪除後台帳號即時踢下線、不能刪自己
+
+**API 基礎建設**
+
+- 統一回應格式 `{code, msg, data}`，業務狀態碼集中在 `errcode/` 管理
+- 全域硬超時（真正取消進行中的 DB/Redis 操作）＋個別路由慢請求 log
+- Request ID 貫穿鏈路（zerolog）、操作日誌（audit log）、統一 panic 回應
+- Swagger 文件（development 環境 `/swagger/index.html`）、CORS、DB 連線池、graceful shutdown
+
+**背景任務與測試**
+
+- asynq 排程：scheduler 到點 enqueue、worker 執行，多 instance 以 `asynq.Unique` 去重
+- mockgen + table-driven handler 測試，不需真實 DB/Redis
+
+**前端與部署**
+
+- Vue 3 後台（`web/`）：登入、前台/後台使用者與錢包管理、操作日誌；
+  選單與按鈕依登入者權限顯隱，詳見 [web/README.md](web/README.md)
+- Dockerfile（multi-stage 約 84MB，容器啟動自動跑 migration）＋
+  GitHub Actions CI ＋ Render 部署 demo
 
 ## 專案結構
 
 ```
 ├── main.go              # 進入點：載入設定、連 DB/Redis、啟動 server、監聽關閉訊號
 ├── app.env              # viper 設定檔（環境變數可覆蓋）
-├── sqlc.yaml            # sqlc 設定（emit_interface: true）
-├── api/                 # gin HTTP handler、路由、middleware、統一回應（*_test.go 為 handler 測試）
-├── cache/               # Cache interface + Redis 實作
-│   └── mock/            # mockgen 產生的 Cache mock（make mock 重新生成）
-├── docs/                # swag 生成的 Swagger 文件（make swagger 重新生成）
-├── errcode/             # 業務狀態碼 enum 與對應訊息
+├── api/                 # gin handler、路由、middleware、統一回應（*_test.go 為 handler 測試）
+├── cache/               # Cache interface + Redis 實作（mock/ 由 mockgen 生成）
 ├── db/
 │   ├── migration/       # golang-migrate 的 SQL migration
-│   ├── query/           # sqlc 的 SQL query 定義
-│   ├── sqlc/            # sqlc 產生的程式碼 + Store interface
-│   └── mock/            # mockgen 產生的 Store mock（make mock 重新生成）
-├── scheduler/           # asynq 排程與背景任務（cron enqueue + worker 執行）
+│   ├── query/           # sqlc 的 SQL query 定義（依 table 分檔）
+│   ├── sqlc/            # sqlc 生成碼 + Store interface
+│   └── mock/            # mockgen 生成的 Store mock
+├── docs/                # swag 生成的 Swagger 文件
+├── errcode/             # 業務狀態碼 enum 與對應訊息
+├── scheduler/           # asynq 排程與背景任務
 ├── util/                # 設定載入等工具
-├── web/                 # Vue 3 後台前端，獨立部署見 web/README.md
+├── web/                 # Vue 3 後台前端
 └── entrypoint.sh        # Docker 容器進入點：先跑 migration 再啟動 main
 ```
 
@@ -51,8 +63,13 @@ Golang Web 專案模板：**gin + viper + sqlc + PostgreSQL + Redis + asynq**。
 ```bash
 make postgres      # 啟動 PostgreSQL + Redis（docker compose）
 make migrateup     # 執行 migration（需安裝 golang-migrate）
-make server        # 啟動 server（0.0.0.0:8080）
+make server        # 啟動 API server（0.0.0.0:8080）
+
+cd web && npm install && npm run dev   # 後台前端（http://localhost:5173）
 ```
+
+後台種子帳號 `admin / admin123`（部署後請立即改密碼）。
+API 一覽與試打用 Swagger：`http://localhost:8080/swagger/index.html`。
 
 或用 Docker：
 
@@ -74,71 +91,8 @@ docker run -p 8080:8080 \
 | `make migrateup` / `make migratedown` | 執行 / 回滾 migration |
 | `make test` | 執行測試（不需要 DB / Redis） |
 
-## API 範例
+## 更多文件
 
-```bash
-# 公開路由
-curl http://localhost:8080/healthz
-curl -X POST http://localhost:8080/users -d '{"username":"danny","email":"danny@example.com","password":"secret123"}'  # 建立前台 user + 錢包
-curl -X POST http://localhost:8080/login -d '{"username":"admin","password":"admin123"}'  # 後台 user 登入（migration 種子帳號，部署後請改密碼）
-
-# 需驗證的路由（header 帶 token，登入者一律是後台 user；資源路由再各自檢查權限，無權限回 403 + 10007）
-curl -H "token: <token>" http://localhost:8080/me                                   # 回登入者 + 權限快照
-curl -X PUT -H "token: <token>" http://localhost:8080/me/password -d '{"old_password":"admin123","new_password":"newsecret456"}'  # 成功後需重新登入
-curl -H "token: <token>" 'http://localhost:8080/wallets?pageNum=1&pageSize=10'      # 所有前台 user 的錢包（wallet:read）
-curl -H "token: <token>" http://localhost:8080/users/1                              # 前台 user（user:read）
-curl -H "token: <token>" 'http://localhost:8080/users?pageNum=1&pageSize=5'         # 前台 user 列表（user:read）
-curl -H "token: <token>" 'http://localhost:8080/admin-users?pageNum=1&pageSize=10'  # 後台 user 列表含角色（admin_user:read）
-curl -H "token: <token>" http://localhost:8080/roles                                # 角色與權限清單（admin_user:read）
-curl -X POST -H "token: <token>" http://localhost:8080/admin-users -d '{"username":"viewer1","password":"viewer123","role_ids":[2]}'  # 建後台帳號（admin_user:write）
-curl -X PUT -H "token: <token>" http://localhost:8080/admin-users/2/roles -d '{"role_ids":[1,2]}'  # 指派角色，整組取代（admin_user:write）
-
-# 軟刪除／還原（列表帶 includeDeleted=true 可看到已刪除者）
-curl -X DELETE -H "token: <token>" http://localhost:8080/users/9                    # 軟刪除前台 user（user:write）
-curl -X PUT    -H "token: <token>" http://localhost:8080/users/9/restore            # 還原（user:write；撞名回 409）
-curl -X DELETE -H "token: <token>" http://localhost:8080/admin-users/2              # 軟刪除後台 user，session 立即失效（admin_user:write；不能刪自己）
-curl -X PUT    -H "token: <token>" http://localhost:8080/admin-users/2/restore      # 還原（admin_user:write）
-```
-
-## Roadmap（尚未實作）
-
-- [x] **後台管理頁面**（`web/`）：sidebar 版型 + 前台使用者列表/依 ID 查詢
-      （`GET /users`、`GET /users/{id}`，分頁）、後台使用者列表（`GET /admin-users`，分頁）、
-      前台使用者錢包列表（`GET /wallets`，分頁）、
-      operation log 列表（`GET /operation-logs`，分頁）、改密碼（`PUT /me/password`）
-- [x] **前台/後台 user 分離** — 本專案定位是後台系統：`admin_users` 表（登入、改密碼、
-      session 都走它，migration 含種子帳號 admin/admin123）；`users` 表為前台 user
-      （公開註冊 + 錢包），後台只做查詢
-- [x] **RBAC 權限控制** — roles / permissions / role_permissions / admin_user_roles 四表 +
-      `permMiddleware("user:read")` 權限中介層（code 用 resource:action，`*` 萬用）；
-      權限快照登入時放進 Redis session，每個 request 零 DB 查詢（改角色需重新登入生效）。
-      後台可建帳號、指派角色（整組取代）；角色/權限本身唯讀，異動用 migration/SQL 管。
-      之後對齊既有 Java 系統的權限表結構時，只需要搬表和資料，middleware 判斷邏輯不動
-- [x] **`/readyz` readiness 端點** — ping DB/Redis，給 LB / ASG(ELB health check) /
-      k8s readiness probe 判斷「這台能不能收流量」；依賴掛了是摘流量等恢復，不是自殺重啟
-- [x] **Session 補完** — sliding TTL（活躍使用者自動續期，不會用到一半被登出）+
-      `PUT /me/password` 改密碼（刪除目前 session 強制重登）+
-      `admin_session:<uid>` 反查索引（一人一 session；刪帳號即時踢下線，見 NOTES「驗證層」）
-- [x] **使用者軟刪除（前後台）** — `deleted_at` + partial unique index（同名可重新註冊、
-      還原撞名回 409）、`includeDeleted` 列表參數、還原 API；後台帳號刪除即時踢 session、
-      不能刪自己；前台刪除掛新權限 `user:write`。web 端有刪除（兩段式確認）／還原／含已刪除切換
-- [x] **Render 部署 demo**（Postgres + Redis + Web Service + Static Site）
-      — migration 隨容器啟動自動跑、CORS 收斂、production 模式；細節與免費方案的
-      限制（Postgres 30 天到期、Pre-Deploy Command 鎖付費方案）見 NOTES「Render 部署」
-- [ ] **錢包加扣款** — 帳本表 `wallet_entries`（金額正負、備註、操作者、時間），
-      加減與餘額檢查用單句 `UPDATE ... SET balance = balance + $1 ... AND balance + $1 >= 0`
-      保證併發安全（不夠扣回 30001 餘額不足，錢包錯誤碼 3xxxx 段啟用）；
-      新權限 `wallet:write`；web 加「加款/扣款」彈窗 + 異動明細列表頁；補併發測試
-- [ ] **首頁 Dashboard 統計卡片** — 前台使用者數、錢包總餘額、今日操作數等，
-      讓後台首頁不再只是導覽卡
-- [ ] **Prometheus + Grafana 監控**（本地/demo 環境，Render 跑不了 sidecar）—
-      gin middleware 收 request duration histogram（路由/狀態碼 label）、
-      `/metrics` 不對外（獨立 port 或不過 CORS）、asynq exporter、
-      業務指標（登入成功/失敗、錢包異動）；Prometheus + Grafana 進 docker compose，
-      Grafana dashboard 用 provisioning 檔案進版控
-- [ ] **kafka** — 有實際場景再加；原則：獨立 goroutine 執行、
-      掛掉只記 log 不拖垮 HTTP server，graceful shutdown 時一併優雅關閉
-
-明確不做（模板定位是 code，運維交給部署方）：log 收集/alerting、secrets 管理、壓測。
-
-已完成項目的演進紀錄與設計細節見 [NOTES.md](NOTES.md)。
+- [NOTES.md](NOTES.md) — 設計理由與實作細節（驗證層、RBAC、軟刪除、超時控制、部署…）
+- [ROADMAP.md](ROADMAP.md) — 功能演進紀錄與待辦
+- [web/README.md](web/README.md) — 前端說明與 Render 部署
