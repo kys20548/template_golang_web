@@ -30,7 +30,7 @@ src/
     Pagination.vue    # 分頁列表共用的上一頁/下一頁元件
   views/
     LoginView.vue          # 登入（後台 user）
-    DashboardView.vue      # 首頁：快捷入口卡片（依權限過濾）
+    DashboardView.vue      # 首頁：統計卡片（後端依權限給值）+ 快捷入口卡片（依權限過濾）
     UsersView.vue          # 前台使用者分頁列表 + 依 ID 查詢
     AdminUsersView.vue     # 後台使用者：列表含角色 + 新增帳號 + 指派角色
     RolesView.vue          # 角色與權限唯讀清單

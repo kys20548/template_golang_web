@@ -132,6 +132,19 @@ curl -H "token: $TOKEN" localhost:8080/me
   沿用 `wallet:read`。單筆查詢與明細**不過濾軟刪除使用者**——人刪了帳要能查；
   錢包「列表」維持只列未刪除者。
 
+## Dashboard 統計卡片
+
+`GET /dashboard/stats` 一次回三個統計：前台使用者數（`user:read`）、
+錢包總餘額（`wallet:read`）、今日操作數（`operation_log:read`）。
+
+- **權限過濾在欄位層級**，不掛 permMiddleware：一支 API 跨三種資源，
+  掛任何單一權限都不對；登入即可打，handler 內逐項檢查權限，
+  無權限的欄位回 null 且**不打對應查詢**。前端只顯示有值的卡片。
+- 欄位用指標是因為 null 與 0 語意不同：null = 無權限、0 = 統計就是 0。
+- 「今日」用**本地時區**當天 0 點起算（與 cron、operation log 顯示一致）；
+  DB 存 timestamptz，比較時傳進去的 time.Time 自帶時區，不用管 DB 時區。
+- 統計口徑與列表一致：使用者數、錢包總餘額都只算未刪除的前台使用者。
+
 ## Request ID 貫穿鏈路
 
 `requestIDMiddleware` 為每個請求產生 UUID（client 有帶 `X-Request-Id` 就沿用，

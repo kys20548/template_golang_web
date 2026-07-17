@@ -271,6 +271,42 @@ const docTemplate = `{
                 }
             }
         },
+        "/dashboard/stats": {
+            "get": {
+                "security": [
+                    {
+                        "TokenAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system"
+                ],
+                "summary": "首頁統計卡片",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/api.dashboardStatsResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/healthz": {
             "get": {
                 "produces": [
@@ -1267,6 +1303,23 @@ const docTemplate = `{
                 },
                 "wallet": {
                     "$ref": "#/definitions/db.Wallet"
+                }
+            }
+        },
+        "api.dashboardStatsResponse": {
+            "type": "object",
+            "properties": {
+                "today_operation_count": {
+                    "description": "TodayOperationCount 今日操作數（本地時區當天 0 點起），需 operation_log:read",
+                    "type": "integer"
+                },
+                "user_count": {
+                    "description": "UserCount 前台使用者數（未刪除），需 user:read",
+                    "type": "integer"
+                },
+                "wallet_balance_total": {
+                    "description": "WalletBalanceTotal 錢包總餘額（未刪除使用者），需 wallet:read",
+                    "type": "integer"
                 }
             }
         },

@@ -102,6 +102,21 @@ func (mr *MockStoreMockRecorder) CountOperationLogs(ctx any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountOperationLogs", reflect.TypeOf((*MockStore)(nil).CountOperationLogs), ctx)
 }
 
+// CountOperationLogsSince mocks base method.
+func (m *MockStore) CountOperationLogsSince(ctx context.Context, createdAt time.Time) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CountOperationLogsSince", ctx, createdAt)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CountOperationLogsSince indicates an expected call of CountOperationLogsSince.
+func (mr *MockStoreMockRecorder) CountOperationLogsSince(ctx, createdAt any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountOperationLogsSince", reflect.TypeOf((*MockStore)(nil).CountOperationLogsSince), ctx, createdAt)
+}
+
 // CountUsers mocks base method.
 func (m *MockStore) CountUsers(ctx context.Context, includeDeleted bool) (int64, error) {
 	m.ctrl.T.Helper()
@@ -592,6 +607,21 @@ func (m *MockStore) SoftDeleteUser(ctx context.Context, id int64) (int64, error)
 func (mr *MockStoreMockRecorder) SoftDeleteUser(ctx, id any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SoftDeleteUser", reflect.TypeOf((*MockStore)(nil).SoftDeleteUser), ctx, id)
+}
+
+// SumWalletBalances mocks base method.
+func (m *MockStore) SumWalletBalances(ctx context.Context) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SumWalletBalances", ctx)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SumWalletBalances indicates an expected call of SumWalletBalances.
+func (mr *MockStoreMockRecorder) SumWalletBalances(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SumWalletBalances", reflect.TypeOf((*MockStore)(nil).SumWalletBalances), ctx)
 }
 
 // UpdateAdminUserPassword mocks base method.

@@ -1,8 +1,33 @@
 <script setup>
-import { computed, inject } from 'vue'
+import { computed, inject, onMounted, ref } from 'vue'
+import { request } from '../api/client'
 import { hasPerm } from '../auth/perm'
 
 const user = inject('authUser')
+
+// 統計卡片：後端依權限個別過濾，無權限的欄位是 null，前端只顯示有值的
+const stats = ref(null)
+const statsError = ref('')
+
+async function fetchStats() {
+  statsError.value = ''
+  try {
+    stats.value = await request('/dashboard/stats')
+  } catch (e) {
+    statsError.value = e.message
+  }
+}
+
+onMounted(fetchStats)
+
+const statCards = computed(() => {
+  if (!stats.value) return []
+  return [
+    { label: '前台使用者數', value: stats.value.user_count },
+    { label: '錢包總餘額', value: stats.value.wallet_balance_total },
+    { label: '今日操作數', value: stats.value.today_operation_count },
+  ].filter((card) => card.value !== null)
+})
 
 const cards = [
   { to: '/users', label: '前台使用者', desc: '查詢帳號、瀏覽分頁列表', perm: 'user:read' },
@@ -23,6 +48,14 @@ const visibleCards = computed(() =>
   <p class="muted" v-if="user">
     歡迎回來，<strong>{{ user.username }}</strong>。
   </p>
+
+  <p v-if="statsError" role="alert">{{ statsError }}</p>
+  <div class="card-grid" v-if="statCards.length" style="margin-bottom: var(--space-5)">
+    <div v-for="card in statCards" :key="card.label" class="card">
+      <div class="stat-label">{{ card.label }}</div>
+      <div class="stat-value">{{ card.value.toLocaleString() }}</div>
+    </div>
+  </div>
 
   <div class="card-grid">
     <router-link v-for="card in visibleCards" :key="card.to" :to="card.to" class="card">

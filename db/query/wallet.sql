@@ -21,6 +21,13 @@ FROM wallets w
 JOIN users u ON u.id = w.user_id
 WHERE u.deleted_at IS NULL;
 
+-- Dashboard 統計：錢包總餘額（與列表同樣只算未刪除的前台使用者）
+-- name: SumWalletBalances :one
+SELECT COALESCE(sum(w.balance), 0)::bigint
+FROM wallets w
+JOIN users u ON u.id = w.user_id
+WHERE u.deleted_at IS NULL;
+
 -- name: GetWallet :one
 SELECT * FROM wallets
 WHERE id = $1;

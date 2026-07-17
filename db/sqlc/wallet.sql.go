@@ -172,3 +172,18 @@ func (q *Queries) ListWallets(ctx context.Context, arg ListWalletsParams) ([]Lis
 	}
 	return items, nil
 }
+
+const sumWalletBalances = `-- name: SumWalletBalances :one
+SELECT COALESCE(sum(w.balance), 0)::bigint
+FROM wallets w
+JOIN users u ON u.id = w.user_id
+WHERE u.deleted_at IS NULL
+`
+
+// Dashboard 統計：錢包總餘額（與列表同樣只算未刪除的前台使用者）
+func (q *Queries) SumWalletBalances(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, sumWalletBalances)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}

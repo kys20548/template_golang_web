@@ -22,6 +22,19 @@ func (q *Queries) CountOperationLogs(ctx context.Context) (int64, error) {
 	return count, err
 }
 
+const countOperationLogsSince = `-- name: CountOperationLogsSince :one
+SELECT count(*) FROM operation_logs
+WHERE created_at >= $1
+`
+
+// Dashboard 統計：某時間點之後的操作數（今日 = 本地時區當天 0 點起）
+func (q *Queries) CountOperationLogsSince(ctx context.Context, createdAt time.Time) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countOperationLogsSince, createdAt)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createOperationLog = `-- name: CreateOperationLog :one
 INSERT INTO operation_logs (
     user_id, username, method, path, request_body, status_code, request_id

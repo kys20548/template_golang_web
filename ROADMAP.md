@@ -35,10 +35,11 @@
       web 加「加款/扣款」表單 + 異動明細頁；併發測試打真 DB
       （10 併發扣款恰好 5 成功 5 不足，DB 沒起就 skip）。設計見 NOTES「錢包加扣款」
 
-## 待做（依序）
+- [x] **首頁 Dashboard 統計卡片** — `GET /dashboard/stats` 回前台使用者數、
+      錢包總餘額、今日操作數（本地時區當天 0 點起）；不掛 permMiddleware，
+      回應內各統計依登入者權限個別過濾（無權限的欄位 null，前端只顯示有值的卡片）
 
-- [ ] **首頁 Dashboard 統計卡片** — 前台使用者數、錢包總餘額、今日操作數等，
-      讓後台首頁不再只是導覽卡
+## 待做（依序）
 - [ ] **Prometheus + Grafana 監控**（本地/demo 環境，Render 跑不了 sidecar）—
       gin middleware 收 request duration histogram（路由/狀態碼 label）、
       `/metrics` 不對外（獨立 port 或不過 CORS）、asynq exporter、

@@ -15,6 +15,8 @@ type Querier interface {
 	AdjustWalletBalance(ctx context.Context, arg AdjustWalletBalanceParams) (Wallet, error)
 	CountAdminUsers(ctx context.Context, includeDeleted bool) (int64, error)
 	CountOperationLogs(ctx context.Context) (int64, error)
+	// Dashboard 統計：某時間點之後的操作數（今日 = 本地時區當天 0 點起）
+	CountOperationLogsSince(ctx context.Context, createdAt time.Time) (int64, error)
 	CountUsers(ctx context.Context, includeDeleted bool) (int64, error)
 	CountWalletEntries(ctx context.Context, walletID int64) (int64, error)
 	CountWallets(ctx context.Context) (int64, error)
@@ -48,6 +50,8 @@ type Querier interface {
 	RestoreUser(ctx context.Context, id int64) (int64, error)
 	SoftDeleteAdminUser(ctx context.Context, id int64) (int64, error)
 	SoftDeleteUser(ctx context.Context, id int64) (int64, error)
+	// Dashboard 統計：錢包總餘額（與列表同樣只算未刪除的前台使用者）
+	SumWalletBalances(ctx context.Context) (int64, error)
 	UpdateAdminUserPassword(ctx context.Context, arg UpdateAdminUserPasswordParams) error
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
 }

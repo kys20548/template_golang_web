@@ -82,6 +82,8 @@ func (server *Server) setupRouter() {
 	authRoutes.POST("/logout", server.logout)
 	authRoutes.GET("/me", server.me)
 	authRoutes.PUT("/me/password", server.changePassword)
+	// 統計卡片不掛 permMiddleware：回應內各統計依登入者權限個別過濾
+	authRoutes.GET("/dashboard/stats", server.dashboardStats)
 	// 資源查詢／管理：依 resource:action 檢查權限
 	authRoutes.GET("/wallets", permMiddleware("wallet:read"), server.listWallets)
 	authRoutes.GET("/wallets/:id", permMiddleware("wallet:read"), server.getWallet)
