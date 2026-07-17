@@ -20,3 +20,22 @@ SELECT count(*)
 FROM wallets w
 JOIN users u ON u.id = w.user_id
 WHERE u.deleted_at IS NULL;
+
+-- name: GetWallet :one
+SELECT * FROM wallets
+WHERE id = $1;
+
+-- 明細頁抬頭：連同使用者帳號一起回。不過濾軟刪除——使用者刪了帳本仍要可查
+-- name: GetWalletDetail :one
+SELECT w.id, w.user_id, u.username, u.email, w.balance, w.created_at
+FROM wallets w
+JOIN users u ON u.id = w.user_id
+WHERE w.id = $1;
+
+-- 加扣款與餘額檢查用同一句 UPDATE 保證併發安全：
+-- 兩個併發扣款各自原子地檢查「扣完不為負」，不夠扣的那筆條件不成立回 0 rows
+-- name: AdjustWalletBalance :one
+UPDATE wallets
+SET balance = balance + sqlc.arg(amount)
+WHERE id = sqlc.arg(id) AND balance + sqlc.arg(amount) >= 0
+RETURNING *;

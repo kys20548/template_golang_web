@@ -13,6 +13,7 @@ type Store interface {
 	CreateUserTx(ctx context.Context, arg CreateUserTxParams) (CreateUserTxResult, error)
 	CreateAdminUserTx(ctx context.Context, arg CreateAdminUserTxParams) (CreateAdminUserTxResult, error)
 	UpdateAdminUserRolesTx(ctx context.Context, arg UpdateAdminUserRolesTxParams) error
+	AdjustWalletTx(ctx context.Context, arg AdjustWalletTxParams) (AdjustWalletTxResult, error)
 	// Ping 檢查 DB 連線是否正常，供啟動檢查與 readiness 探針使用。
 	Ping(ctx context.Context) error
 }

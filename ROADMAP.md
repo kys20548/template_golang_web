@@ -28,12 +28,15 @@
       — migration 隨容器啟動自動跑、CORS 收斂、production 模式；細節與免費方案的
       限制（Postgres 30 天到期、Pre-Deploy Command 鎖付費方案）見 NOTES「Render 部署」
 
+- [x] **錢包加扣款** — 帳本表 `wallet_entries`（金額正負、備註、操作者快照、時間），
+      加減與餘額檢查用單句條件 UPDATE 保證併發安全（不夠扣回 30001 餘額不足，
+      錢包錯誤碼 3xxxx 段啟用；錢包不存在回 404）；新權限 `wallet:write`；
+      `GET /wallets/{id}`、`GET /wallets/{id}/entries`、`POST /wallets/{id}/adjust`；
+      web 加「加款/扣款」表單 + 異動明細頁；併發測試打真 DB
+      （10 併發扣款恰好 5 成功 5 不足，DB 沒起就 skip）。設計見 NOTES「錢包加扣款」
+
 ## 待做（依序）
 
-- [ ] **錢包加扣款** — 帳本表 `wallet_entries`（金額正負、備註、操作者、時間），
-      加減與餘額檢查用單句 `UPDATE ... SET balance = balance + $1 ... AND balance + $1 >= 0`
-      保證併發安全（不夠扣回 30001 餘額不足，錢包錯誤碼 3xxxx 段啟用）；
-      新權限 `wallet:write`；web 加「加款/扣款」彈窗 + 異動明細列表頁；補併發測試
 - [ ] **首頁 Dashboard 統計卡片** — 前台使用者數、錢包總餘額、今日操作數等，
       讓後台首頁不再只是導覽卡
 - [ ] **Prometheus + Grafana 監控**（本地/demo 環境，Render 跑不了 sidecar）—

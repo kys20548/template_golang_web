@@ -84,6 +84,9 @@ func (server *Server) setupRouter() {
 	authRoutes.PUT("/me/password", server.changePassword)
 	// 資源查詢／管理：依 resource:action 檢查權限
 	authRoutes.GET("/wallets", permMiddleware("wallet:read"), server.listWallets)
+	authRoutes.GET("/wallets/:id", permMiddleware("wallet:read"), server.getWallet)
+	authRoutes.GET("/wallets/:id/entries", permMiddleware("wallet:read"), server.listWalletEntries)
+	authRoutes.POST("/wallets/:id/adjust", permMiddleware("wallet:write"), server.adjustWallet)
 	authRoutes.GET("/users/:id", permMiddleware("user:read"), server.getUser)
 	// 個別路由範例：超過 2s 印 slow request WARN log（不中斷請求）
 	authRoutes.GET("/users", permMiddleware("user:read"), slowLogMiddleware(2000*time.Millisecond), server.listUsers)

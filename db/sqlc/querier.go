@@ -10,15 +10,20 @@ import (
 )
 
 type Querier interface {
+	// 加扣款與餘額檢查用同一句 UPDATE 保證併發安全：
+	// 兩個併發扣款各自原子地檢查「扣完不為負」，不夠扣的那筆條件不成立回 0 rows
+	AdjustWalletBalance(ctx context.Context, arg AdjustWalletBalanceParams) (Wallet, error)
 	CountAdminUsers(ctx context.Context, includeDeleted bool) (int64, error)
 	CountOperationLogs(ctx context.Context) (int64, error)
 	CountUsers(ctx context.Context, includeDeleted bool) (int64, error)
+	CountWalletEntries(ctx context.Context, walletID int64) (int64, error)
 	CountWallets(ctx context.Context) (int64, error)
 	CreateAdminUser(ctx context.Context, arg CreateAdminUserParams) (AdminUser, error)
 	CreateAdminUserRole(ctx context.Context, arg CreateAdminUserRoleParams) error
 	CreateOperationLog(ctx context.Context, arg CreateOperationLogParams) (OperationLog, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateWallet(ctx context.Context, userID int64) (Wallet, error)
+	CreateWalletEntry(ctx context.Context, arg CreateWalletEntryParams) (WalletEntry, error)
 	DeleteAdminUserRoles(ctx context.Context, adminUserID int64) error
 	DeleteOperationLogsBefore(ctx context.Context, createdAt time.Time) (int64, error)
 	GetAdminUser(ctx context.Context, id int64) (AdminUser, error)
@@ -26,6 +31,9 @@ type Querier interface {
 	// GetUser 不過濾 deleted_at：後台以 ID 查詳情時，已刪除者也要能查到
 	GetUser(ctx context.Context, id int64) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
+	GetWallet(ctx context.Context, id int64) (Wallet, error)
+	// 明細頁抬頭：連同使用者帳號一起回。不過濾軟刪除——使用者刪了帳本仍要可查
+	GetWalletDetail(ctx context.Context, id int64) (GetWalletDetailRow, error)
 	ListAdminUserRoles(ctx context.Context) ([]ListAdminUserRolesRow, error)
 	ListAdminUsers(ctx context.Context, arg ListAdminUsersParams) ([]AdminUser, error)
 	ListOperationLogs(ctx context.Context, arg ListOperationLogsParams) ([]OperationLog, error)
@@ -33,6 +41,7 @@ type Querier interface {
 	ListRolePermissions(ctx context.Context) ([]ListRolePermissionsRow, error)
 	ListRoles(ctx context.Context) ([]Role, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
+	ListWalletEntries(ctx context.Context, arg ListWalletEntriesParams) ([]WalletEntry, error)
 	// 錢包列表只顯示未刪除的前台使用者
 	ListWallets(ctx context.Context, arg ListWalletsParams) ([]ListWalletsRow, error)
 	RestoreAdminUser(ctx context.Context, id int64) (int64, error)

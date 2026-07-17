@@ -42,6 +42,36 @@ func (m *MockStore) EXPECT() *MockStoreMockRecorder {
 	return m.recorder
 }
 
+// AdjustWalletBalance mocks base method.
+func (m *MockStore) AdjustWalletBalance(ctx context.Context, arg db.AdjustWalletBalanceParams) (db.Wallet, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AdjustWalletBalance", ctx, arg)
+	ret0, _ := ret[0].(db.Wallet)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AdjustWalletBalance indicates an expected call of AdjustWalletBalance.
+func (mr *MockStoreMockRecorder) AdjustWalletBalance(ctx, arg any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AdjustWalletBalance", reflect.TypeOf((*MockStore)(nil).AdjustWalletBalance), ctx, arg)
+}
+
+// AdjustWalletTx mocks base method.
+func (m *MockStore) AdjustWalletTx(ctx context.Context, arg db.AdjustWalletTxParams) (db.AdjustWalletTxResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AdjustWalletTx", ctx, arg)
+	ret0, _ := ret[0].(db.AdjustWalletTxResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AdjustWalletTx indicates an expected call of AdjustWalletTx.
+func (mr *MockStoreMockRecorder) AdjustWalletTx(ctx, arg any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AdjustWalletTx", reflect.TypeOf((*MockStore)(nil).AdjustWalletTx), ctx, arg)
+}
+
 // CountAdminUsers mocks base method.
 func (m *MockStore) CountAdminUsers(ctx context.Context, includeDeleted bool) (int64, error) {
 	m.ctrl.T.Helper()
@@ -85,6 +115,21 @@ func (m *MockStore) CountUsers(ctx context.Context, includeDeleted bool) (int64,
 func (mr *MockStoreMockRecorder) CountUsers(ctx, includeDeleted any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountUsers", reflect.TypeOf((*MockStore)(nil).CountUsers), ctx, includeDeleted)
+}
+
+// CountWalletEntries mocks base method.
+func (m *MockStore) CountWalletEntries(ctx context.Context, walletID int64) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CountWalletEntries", ctx, walletID)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CountWalletEntries indicates an expected call of CountWalletEntries.
+func (mr *MockStoreMockRecorder) CountWalletEntries(ctx, walletID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountWalletEntries", reflect.TypeOf((*MockStore)(nil).CountWalletEntries), ctx, walletID)
 }
 
 // CountWallets mocks base method.
@@ -206,6 +251,21 @@ func (mr *MockStoreMockRecorder) CreateWallet(ctx, userID any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateWallet", reflect.TypeOf((*MockStore)(nil).CreateWallet), ctx, userID)
 }
 
+// CreateWalletEntry mocks base method.
+func (m *MockStore) CreateWalletEntry(ctx context.Context, arg db.CreateWalletEntryParams) (db.WalletEntry, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateWalletEntry", ctx, arg)
+	ret0, _ := ret[0].(db.WalletEntry)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateWalletEntry indicates an expected call of CreateWalletEntry.
+func (mr *MockStoreMockRecorder) CreateWalletEntry(ctx, arg any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateWalletEntry", reflect.TypeOf((*MockStore)(nil).CreateWalletEntry), ctx, arg)
+}
+
 // DeleteAdminUserRoles mocks base method.
 func (m *MockStore) DeleteAdminUserRoles(ctx context.Context, adminUserID int64) error {
 	m.ctrl.T.Helper()
@@ -293,6 +353,36 @@ func (m *MockStore) GetUserByUsername(ctx context.Context, username string) (db.
 func (mr *MockStoreMockRecorder) GetUserByUsername(ctx, username any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserByUsername", reflect.TypeOf((*MockStore)(nil).GetUserByUsername), ctx, username)
+}
+
+// GetWallet mocks base method.
+func (m *MockStore) GetWallet(ctx context.Context, id int64) (db.Wallet, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetWallet", ctx, id)
+	ret0, _ := ret[0].(db.Wallet)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetWallet indicates an expected call of GetWallet.
+func (mr *MockStoreMockRecorder) GetWallet(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetWallet", reflect.TypeOf((*MockStore)(nil).GetWallet), ctx, id)
+}
+
+// GetWalletDetail mocks base method.
+func (m *MockStore) GetWalletDetail(ctx context.Context, id int64) (db.GetWalletDetailRow, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetWalletDetail", ctx, id)
+	ret0, _ := ret[0].(db.GetWalletDetailRow)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetWalletDetail indicates an expected call of GetWalletDetail.
+func (mr *MockStoreMockRecorder) GetWalletDetail(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetWalletDetail", reflect.TypeOf((*MockStore)(nil).GetWalletDetail), ctx, id)
 }
 
 // ListAdminUserRoles mocks base method.
@@ -398,6 +488,21 @@ func (m *MockStore) ListUsers(ctx context.Context, arg db.ListUsersParams) ([]db
 func (mr *MockStoreMockRecorder) ListUsers(ctx, arg any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListUsers", reflect.TypeOf((*MockStore)(nil).ListUsers), ctx, arg)
+}
+
+// ListWalletEntries mocks base method.
+func (m *MockStore) ListWalletEntries(ctx context.Context, arg db.ListWalletEntriesParams) ([]db.WalletEntry, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListWalletEntries", ctx, arg)
+	ret0, _ := ret[0].([]db.WalletEntry)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListWalletEntries indicates an expected call of ListWalletEntries.
+func (mr *MockStoreMockRecorder) ListWalletEntries(ctx, arg any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListWalletEntries", reflect.TypeOf((*MockStore)(nil).ListWalletEntries), ctx, arg)
 }
 
 // ListWallets mocks base method.

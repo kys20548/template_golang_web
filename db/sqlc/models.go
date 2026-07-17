@@ -68,3 +68,13 @@ type Wallet struct {
 	Balance   int64     `json:"balance"`
 	CreatedAt time.Time `json:"created_at"`
 }
+
+type WalletEntry struct {
+	ID               int64     `json:"id"`
+	WalletID         int64     `json:"wallet_id"`
+	Amount           int64     `json:"amount"`
+	Note             string    `json:"note"`
+	OperatorID       int64     `json:"operator_id"`
+	OperatorUsername string    `json:"operator_username"`
+	CreatedAt        time.Time `json:"created_at"`
+}

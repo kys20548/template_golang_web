@@ -29,11 +29,12 @@
 **背景任務與測試**
 
 - asynq 排程：scheduler 到點 enqueue、worker 執行，多 instance 以 `asynq.Unique` 去重
-- mockgen + table-driven handler 測試，不需真實 DB/Redis
+- mockgen + table-driven handler 測試，不需真實 DB/Redis；
+  錢包併發扣款測試打真 DB 驗證（本地 DB 沒起就 skip）
 
 **前端與部署**
 
-- Vue 3 後台（`web/`）：登入、前台/後台使用者與錢包管理、操作日誌；
+- Vue 3 後台（`web/`）：登入、前台/後台使用者管理、錢包加扣款與異動明細、操作日誌；
   選單與按鈕依登入者權限顯隱，詳見 [web/README.md](web/README.md)
 - Dockerfile（multi-stage 約 84MB，容器啟動自動跑 migration）＋
   GitHub Actions CI ＋ Render 部署 demo

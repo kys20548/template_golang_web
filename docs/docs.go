@@ -903,6 +903,200 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/wallets/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "TokenAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "wallet"
+                ],
+                "summary": "錢包單筆查詢",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "錢包 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/db.GetWalletDetailRow"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "404": {
+                        "description": "錢包不存在",
+                        "schema": {
+                            "$ref": "#/definitions/api.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/wallets/{id}/adjust": {
+            "post": {
+                "security": [
+                    {
+                        "TokenAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "wallet"
+                ],
+                "summary": "錢包加扣款",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "錢包 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "金額（正加負扣、不可為 0）與備註",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.adjustWalletRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/db.AdjustWalletTxResult"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "餘額不足（code 30001）",
+                        "schema": {
+                            "$ref": "#/definitions/api.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "錢包不存在",
+                        "schema": {
+                            "$ref": "#/definitions/api.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/wallets/{id}/entries": {
+            "get": {
+                "security": [
+                    {
+                        "TokenAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "wallet"
+                ],
+                "summary": "錢包異動明細列表",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "錢包 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "頁碼（從 1 開始）",
+                        "name": "pageNum",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每頁筆數（5-50）",
+                        "name": "pageSize",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/definitions/api.PageResult"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "list": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/definitions/db.WalletEntry"
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -947,6 +1141,22 @@ const docTemplate = `{
                 "data": {},
                 "msg": {
                     "type": "string"
+                }
+            }
+        },
+        "api.adjustWalletRequest": {
+            "type": "object",
+            "required": [
+                "amount"
+            ],
+            "properties": {
+                "amount": {
+                    "description": "Amount 正為加款、負為扣款；required 同時擋掉 0",
+                    "type": "integer"
+                },
+                "note": {
+                    "type": "string",
+                    "maxLength": 255
                 }
             }
         },
@@ -1184,6 +1394,40 @@ const docTemplate = `{
                 }
             }
         },
+        "db.AdjustWalletTxResult": {
+            "type": "object",
+            "properties": {
+                "entry": {
+                    "$ref": "#/definitions/db.WalletEntry"
+                },
+                "wallet": {
+                    "$ref": "#/definitions/db.Wallet"
+                }
+            }
+        },
+        "db.GetWalletDetailRow": {
+            "type": "object",
+            "properties": {
+                "balance": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "user_id": {
+                    "type": "integer"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
         "db.ListWalletsRow": {
             "type": "object",
             "properties": {
@@ -1224,6 +1468,32 @@ const docTemplate = `{
                 }
             }
         },
+        "db.WalletEntry": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "operator_id": {
+                    "type": "integer"
+                },
+                "operator_username": {
+                    "type": "string"
+                },
+                "wallet_id": {
+                    "type": "integer"
+                }
+            }
+        },
         "errcode.Code": {
             "type": "integer",
             "enum": [
@@ -1239,7 +1509,8 @@ const docTemplate = `{
                 20002,
                 20003,
                 20004,
-                20005
+                20005,
+                30001
             ],
             "x-enum-varnames": [
                 "Success",
@@ -1254,7 +1525,8 @@ const docTemplate = `{
                 "ErrUserExists",
                 "ErrWrongCredentials",
                 "ErrTooManyLoginFails",
-                "ErrCannotDeleteSelf"
+                "ErrCannotDeleteSelf",
+                "ErrInsufficientBalance"
             ]
         }
     },

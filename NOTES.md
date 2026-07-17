@@ -108,6 +108,30 @@ curl -H "token: $TOKEN" localhost:8080/me
 - 前台 user 刪除／還原掛新權限 `user:write`（seed 只給 super_admin）；
   後台 user 沿用 `admin_user:write`。
 
+## 錢包加扣款（帳本 + 併發安全）
+
+`wallet_entries` 帳本表（migration 000008）：一筆加扣款一列，`amount` 正為加款、
+負為扣款，帶備註與操作者（`operator_id` FK + `operator_username` 快照，
+與 operation_logs 同樣的快照思路——人刪了帳本仍可讀）。
+
+- **併發安全靠單句條件 UPDATE**，不用 SELECT ... FOR UPDATE、不用 serializable：
+  `UPDATE wallets SET balance = balance + $1 WHERE id = $2 AND balance + $1 >= 0`
+  ——同一列的併發 UPDATE 在 PostgreSQL 會互相排隊，後到的在前一筆 commit 後
+  以**新值**重新評估 WHERE，不夠扣的那筆條件不成立回 0 rows，永遠扣不到負數。
+- **0 rows 的歧義**要拆開：錢包不存在 vs 餘額不足。`AdjustWalletTx` 收到
+  ErrNoRows 時再查一次錢包，存在就轉成 `db.ErrInsufficientBalance`
+  （sentinel error，handler 對應 400 + 30001，錢包錯誤碼 3xxxx 段啟用），
+  不存在維持 ErrNoRows → 404。
+- **UPDATE 與寫帳本在同一個 transaction**（`AdjustWalletTx`），
+  不會出現「錢動了帳本沒記」或反過來。
+- **併發測試打真 DB**（`db/sqlc/tx_adjust_wallet_test.go`）：mock 驗不了
+  資料庫的併發語意——餘額 500 起 10 個 goroutine 同時各扣 100，
+  斷言恰好 5 成功、5 餘額不足、終值 0、帳本筆數吻合；本地 DB 沒起就 skip，
+  不擋沒有 docker 的環境跑 `make test`。
+- 新權限 `wallet:write`（seed 只給 super_admin）；查詢類（單筆、明細列表）
+  沿用 `wallet:read`。單筆查詢與明細**不過濾軟刪除使用者**——人刪了帳要能查；
+  錢包「列表」維持只列未刪除者。
+
 ## Request ID 貫穿鏈路
 
 `requestIDMiddleware` 為每個請求產生 UUID（client 有帶 `X-Request-Id` 就沿用，

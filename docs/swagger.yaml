@@ -29,6 +29,17 @@ definitions:
       msg:
         type: string
     type: object
+  api.adjustWalletRequest:
+    properties:
+      amount:
+        description: Amount 正為加款、負為扣款；required 同時擋掉 0
+        type: integer
+      note:
+        maxLength: 255
+        type: string
+    required:
+    - amount
+    type: object
   api.adminUserResponse:
     properties:
       created_at:
@@ -184,6 +195,28 @@ definitions:
       username:
         type: string
     type: object
+  db.AdjustWalletTxResult:
+    properties:
+      entry:
+        $ref: '#/definitions/db.WalletEntry'
+      wallet:
+        $ref: '#/definitions/db.Wallet'
+    type: object
+  db.GetWalletDetailRow:
+    properties:
+      balance:
+        type: integer
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: integer
+      user_id:
+        type: integer
+      username:
+        type: string
+    type: object
   db.ListWalletsRow:
     properties:
       balance:
@@ -210,6 +243,23 @@ definitions:
       user_id:
         type: integer
     type: object
+  db.WalletEntry:
+    properties:
+      amount:
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: integer
+      note:
+        type: string
+      operator_id:
+        type: integer
+      operator_username:
+        type: string
+      wallet_id:
+        type: integer
+    type: object
   errcode.Code:
     enum:
     - 0
@@ -225,6 +275,7 @@ definitions:
     - 20003
     - 20004
     - 20005
+    - 30001
     type: integer
     x-enum-varnames:
     - Success
@@ -240,6 +291,7 @@ definitions:
     - ErrWrongCredentials
     - ErrTooManyLoginFails
     - ErrCannotDeleteSelf
+    - ErrInsufficientBalance
 host: localhost:8080
 info:
   contact: {}
@@ -758,6 +810,118 @@ paths:
       security:
       - TokenAuth: []
       summary: 錢包列表（前台 user）
+      tags:
+      - wallet
+  /wallets/{id}:
+    get:
+      parameters:
+      - description: 錢包 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/db.GetWalletDetailRow'
+              type: object
+        "404":
+          description: 錢包不存在
+          schema:
+            $ref: '#/definitions/api.Response'
+      security:
+      - TokenAuth: []
+      summary: 錢包單筆查詢
+      tags:
+      - wallet
+  /wallets/{id}/adjust:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 錢包 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 金額（正加負扣、不可為 0）與備註
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.adjustWalletRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/db.AdjustWalletTxResult'
+              type: object
+        "400":
+          description: 餘額不足（code 30001）
+          schema:
+            $ref: '#/definitions/api.Response'
+        "404":
+          description: 錢包不存在
+          schema:
+            $ref: '#/definitions/api.Response'
+      security:
+      - TokenAuth: []
+      summary: 錢包加扣款
+      tags:
+      - wallet
+  /wallets/{id}/entries:
+    get:
+      parameters:
+      - description: 錢包 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 頁碼（從 1 開始）
+        in: query
+        name: pageNum
+        required: true
+        type: integer
+      - description: 每頁筆數（5-50）
+        in: query
+        name: pageSize
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/api.PageResult'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/db.WalletEntry'
+                        type: array
+                    type: object
+              type: object
+      security:
+      - TokenAuth: []
+      summary: 錢包異動明細列表
       tags:
       - wallet
 securityDefinitions:

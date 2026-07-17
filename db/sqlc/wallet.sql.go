@@ -10,6 +10,32 @@ import (
 	"time"
 )
 
+const adjustWalletBalance = `-- name: AdjustWalletBalance :one
+UPDATE wallets
+SET balance = balance + $1
+WHERE id = $2 AND balance + $1 >= 0
+RETURNING id, user_id, balance, created_at
+`
+
+type AdjustWalletBalanceParams struct {
+	Amount int64 `json:"amount"`
+	ID     int64 `json:"id"`
+}
+
+// 加扣款與餘額檢查用同一句 UPDATE 保證併發安全：
+// 兩個併發扣款各自原子地檢查「扣完不為負」，不夠扣的那筆條件不成立回 0 rows
+func (q *Queries) AdjustWalletBalance(ctx context.Context, arg AdjustWalletBalanceParams) (Wallet, error) {
+	row := q.db.QueryRowContext(ctx, adjustWalletBalance, arg.Amount, arg.ID)
+	var i Wallet
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Balance,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const countWallets = `-- name: CountWallets :one
 SELECT count(*)
 FROM wallets w
@@ -38,6 +64,54 @@ func (q *Queries) CreateWallet(ctx context.Context, userID int64) (Wallet, error
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
+		&i.Balance,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getWallet = `-- name: GetWallet :one
+SELECT id, user_id, balance, created_at FROM wallets
+WHERE id = $1
+`
+
+func (q *Queries) GetWallet(ctx context.Context, id int64) (Wallet, error) {
+	row := q.db.QueryRowContext(ctx, getWallet, id)
+	var i Wallet
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Balance,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getWalletDetail = `-- name: GetWalletDetail :one
+SELECT w.id, w.user_id, u.username, u.email, w.balance, w.created_at
+FROM wallets w
+JOIN users u ON u.id = w.user_id
+WHERE w.id = $1
+`
+
+type GetWalletDetailRow struct {
+	ID        int64     `json:"id"`
+	UserID    int64     `json:"user_id"`
+	Username  string    `json:"username"`
+	Email     string    `json:"email"`
+	Balance   int64     `json:"balance"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// 明細頁抬頭：連同使用者帳號一起回。不過濾軟刪除——使用者刪了帳本仍要可查
+func (q *Queries) GetWalletDetail(ctx context.Context, id int64) (GetWalletDetailRow, error) {
+	row := q.db.QueryRowContext(ctx, getWalletDetail, id)
+	var i GetWalletDetailRow
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Username,
+		&i.Email,
 		&i.Balance,
 		&i.CreatedAt,
 	)

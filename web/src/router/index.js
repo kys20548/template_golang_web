@@ -7,6 +7,7 @@ import UsersView from '../views/UsersView.vue'
 import AdminUsersView from '../views/AdminUsersView.vue'
 import RolesView from '../views/RolesView.vue'
 import WalletsView from '../views/WalletsView.vue'
+import WalletEntriesView from '../views/WalletEntriesView.vue'
 import OperationLogsView from '../views/OperationLogsView.vue'
 import ChangePasswordView from '../views/ChangePasswordView.vue'
 
@@ -25,6 +26,7 @@ const router = createRouter({
         { path: 'admin-users', component: AdminUsersView },
         { path: 'roles', component: RolesView },
         { path: 'wallets', component: WalletsView },
+        { path: 'wallets/:id', component: WalletEntriesView },
         { path: 'operation-logs', component: OperationLogsView },
         { path: 'me/password', component: ChangePasswordView },
       ],

@@ -2,8 +2,8 @@
 
 Vue 3 + Vite + Vue Router，純 JS（不含 TypeScript / Pinia / UI 框架，規模用不到，
 之後頁面變多再評估要不要加）。登入後為 sidebar + 內容區的後台版型，涵蓋前台/後台
-使用者查詢、後台帳號管理（新增 + 指派角色）、角色與權限清單、前台使用者錢包列表、
-操作日誌、修改密碼；登入帳號是後台 user（`admin_users`）。
+使用者查詢、後台帳號管理（新增 + 指派角色）、角色與權限清單、前台使用者錢包
+（列表 + 加扣款 + 異動明細）、操作日誌、修改密碼；登入帳號是後台 user（`admin_users`）。
 sidebar 選單與首頁卡片依登入者權限（`/me` 回傳的 permissions 快照）過濾，
 無權限的 API 回 403 時頁面顯示「無權限」提示。
 
@@ -34,7 +34,8 @@ src/
     UsersView.vue          # 前台使用者分頁列表 + 依 ID 查詢
     AdminUsersView.vue     # 後台使用者：列表含角色 + 新增帳號 + 指派角色
     RolesView.vue          # 角色與權限唯讀清單
-    WalletsView.vue        # 前台使用者錢包分頁列表
+    WalletsView.vue        # 前台使用者錢包分頁列表 + 加款/扣款表單（wallet:write）
+    WalletEntriesView.vue  # 單一錢包的異動明細（抬頭餘額 + 分頁列表）
     OperationLogsView.vue  # 操作日誌分頁列表
     ChangePasswordView.vue # 修改密碼（成功後導回登入頁）
 ```
