@@ -88,10 +88,19 @@ func (server *Server) login(ctx *gin.Context) {
 		getLogger(ctx).Warn().Err(err).Msg("cannot clear login fail count")
 	}
 
+	// 權限快照：登入時查一次 DB，之後每個 request 從 session 拿、零 DB 查詢；
+	// 改角色要重新登入才生效（取捨見 NOTES.md「驗證層」）
+	permissions, err := server.store.ListPermissionCodesByAdminUserID(ctx, user.ID)
+	if err != nil {
+		failInternal(ctx, err)
+		return
+	}
+
 	token := uuid.NewString()
 	authUser := AuthUser{
-		UserID:   user.ID,
-		Username: user.Username,
+		UserID:      user.ID,
+		Username:    user.Username,
+		Permissions: permissions,
 	}
 	payload, err := json.Marshal(authUser)
 	if err != nil {

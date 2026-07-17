@@ -14,6 +14,7 @@ const (
 	ErrNotFound      Code = 10004
 	ErrTimeout       Code = 10005
 	ErrNotReady      Code = 10006
+	ErrForbidden     Code = 10007
 
 	// 使用者相關 2xxxx
 	ErrUserNotFound      Code = 20001
@@ -32,6 +33,7 @@ var messages = map[Code]string{
 	ErrNotFound:          "資源不存在",
 	ErrTimeout:           "請求處理逾時",
 	ErrNotReady:          "服務未就緒",
+	ErrForbidden:         "無權限",
 	ErrUserNotFound:      "使用者不存在",
 	ErrUserExists:        "使用者已存在",
 	ErrWrongCredentials:  "帳號或密碼錯誤",

@@ -33,9 +33,22 @@ const (
 )
 
 // AuthUser 為登入者（後台 user）資訊，驗證通過後放入 context 供後續邏輯使用。
+// Permissions 是登入當下的權限快照（permission codes）——之後改角色要重新登入
+// 才生效，取捨同 session 不做反查索引（見 NOTES.md「驗證層」）。
 type AuthUser struct {
-	UserID   int64  `json:"user_id"`
-	Username string `json:"username"`
+	UserID      int64    `json:"user_id"`
+	Username    string   `json:"username"`
+	Permissions []string `json:"permissions"`
+}
+
+// HasPermission 檢查是否具備某權限；permWildcard 代表全部權限。
+func (u AuthUser) HasPermission(code string) bool {
+	for _, p := range u.Permissions {
+		if p == permWildcard || p == code {
+			return true
+		}
+	}
+	return false
 }
 
 func sessionKey(token string) string {
@@ -83,6 +96,21 @@ func authMiddleware(cacheStore cache.Cache, tokenDuration time.Duration) gin.Han
 // getAuthUser 從 context 取出驗證層放入的登入者資訊。
 func getAuthUser(ctx *gin.Context) AuthUser {
 	return ctx.MustGet(authUserKey).(AuthUser)
+}
+
+// permWildcard 為萬用權限 code，super_admin 角色持有。
+const permWildcard = "*"
+
+// permMiddleware 權限層：掛在 authMiddleware 之後的個別路由上，
+// 檢查登入者的權限快照是否含指定 code（或萬用 *），否則 403。
+func permMiddleware(code string) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		if !getAuthUser(ctx).HasPermission(code) {
+			failAbort(ctx, http.StatusForbidden, errcode.ErrForbidden, nil)
+			return
+		}
+		ctx.Next()
+	}
 }
 
 // requestIDMiddleware 為每個請求產生唯一的 request id（client 有帶就沿用，

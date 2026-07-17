@@ -20,6 +20,32 @@ func (q *Queries) CountAdminUsers(ctx context.Context) (int64, error) {
 	return count, err
 }
 
+const createAdminUser = `-- name: CreateAdminUser :one
+INSERT INTO admin_users (
+    username,
+    hashed_password
+) VALUES (
+    $1, $2
+) RETURNING id, username, hashed_password, created_at
+`
+
+type CreateAdminUserParams struct {
+	Username       string `json:"username"`
+	HashedPassword string `json:"hashed_password"`
+}
+
+func (q *Queries) CreateAdminUser(ctx context.Context, arg CreateAdminUserParams) (AdminUser, error) {
+	row := q.db.QueryRowContext(ctx, createAdminUser, arg.Username, arg.HashedPassword)
+	var i AdminUser
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.HashedPassword,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getAdminUser = `-- name: GetAdminUser :one
 SELECT id, username, hashed_password, created_at FROM admin_users
 WHERE id = $1 LIMIT 1

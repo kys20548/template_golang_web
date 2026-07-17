@@ -75,17 +75,23 @@ func (server *Server) setupRouter() {
 	router.POST("/users", server.createUser)
 	router.POST("/login", server.login)
 
-	// 需要驗證的路由：header 帶 token，經 authMiddleware 驗證後才會進到 handler
+	// 需要驗證的路由：header 帶 token，經 authMiddleware 驗證後才會進到 handler；
+	// 資源類路由再各自掛 permMiddleware 檢查權限（登入時的快照，見 NOTES.md「驗證層」）
 	authRoutes := router.Group("/").Use(authMiddleware(server.cache, server.config.TokenDuration))
+	// 只要登入就能用：自己的 session 與密碼
 	authRoutes.POST("/logout", server.logout)
 	authRoutes.GET("/me", server.me)
 	authRoutes.PUT("/me/password", server.changePassword)
-	authRoutes.GET("/wallets", server.listWallets)
-	authRoutes.GET("/users/:id", server.getUser)
+	// 資源查詢／管理：依 resource:action 檢查權限
+	authRoutes.GET("/wallets", permMiddleware("wallet:read"), server.listWallets)
+	authRoutes.GET("/users/:id", permMiddleware("user:read"), server.getUser)
 	// 個別路由範例：超過 2s 印 slow request WARN log（不中斷請求）
-	authRoutes.GET("/users", slowLogMiddleware(2000*time.Millisecond), server.listUsers)
-	authRoutes.GET("/admin-users", server.listAdminUsers)
-	authRoutes.GET("/operation-logs", server.listOperationLogs)
+	authRoutes.GET("/users", permMiddleware("user:read"), slowLogMiddleware(2000*time.Millisecond), server.listUsers)
+	authRoutes.GET("/admin-users", permMiddleware("admin_user:read"), server.listAdminUsers)
+	authRoutes.POST("/admin-users", permMiddleware("admin_user:write"), server.createAdminUser)
+	authRoutes.PUT("/admin-users/:id/roles", permMiddleware("admin_user:write"), server.updateAdminUserRoles)
+	authRoutes.GET("/roles", permMiddleware("admin_user:read"), server.listRoles)
+	authRoutes.GET("/operation-logs", permMiddleware("operation_log:read"), server.listOperationLogs)
 
 	server.router = router
 }

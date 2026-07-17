@@ -8,6 +8,8 @@ Golang Web 專案模板：**gin + viper + sqlc + PostgreSQL + Redis + asynq**。
 - **Token 驗證層**：Redis session、bcrypt 密碼、登入失敗鎖定、即時登出、
   sliding TTL（活躍自動續期）、改密碼強制重新登入；前台/後台 user 分離，
   登入者一律是後台 user（`admin_users`）
+- **RBAC 權限控制**：角色/權限四表 + `permMiddleware("user:read")` 路由層檢查，
+  權限快照放 session、request 零 DB 查詢；後台可建帳號、指派角色
 - **可觀測性**：Request ID 貫穿鏈路（zerolog）、操作日誌（audit log）、統一 panic 回應
 - **API 超時控制**：全域硬超時真正取消 DB/Redis 操作 + 個別路由慢請求 log
 - **排程與背景任務**：asynq scheduler 到點 enqueue、worker 執行，多 instance 以 `asynq.Unique` 去重
@@ -78,13 +80,16 @@ curl http://localhost:8080/healthz
 curl -X POST http://localhost:8080/users -d '{"username":"danny","email":"danny@example.com","password":"secret123"}'  # 建立前台 user + 錢包
 curl -X POST http://localhost:8080/login -d '{"username":"admin","password":"admin123"}'  # 後台 user 登入（migration 種子帳號，部署後請改密碼）
 
-# 需驗證的路由（header 帶 token，登入者一律是後台 user）
-curl -H "token: <token>" http://localhost:8080/me
+# 需驗證的路由（header 帶 token，登入者一律是後台 user；資源路由再各自檢查權限，無權限回 403 + 10007）
+curl -H "token: <token>" http://localhost:8080/me                                   # 回登入者 + 權限快照
 curl -X PUT -H "token: <token>" http://localhost:8080/me/password -d '{"old_password":"admin123","new_password":"newsecret456"}'  # 成功後需重新登入
-curl -H "token: <token>" 'http://localhost:8080/wallets?pageNum=1&pageSize=10'      # 所有前台 user 的錢包
-curl -H "token: <token>" http://localhost:8080/users/1                              # 前台 user
-curl -H "token: <token>" 'http://localhost:8080/users?pageNum=1&pageSize=5'         # 前台 user 列表
-curl -H "token: <token>" 'http://localhost:8080/admin-users?pageNum=1&pageSize=10'  # 後台 user 列表
+curl -H "token: <token>" 'http://localhost:8080/wallets?pageNum=1&pageSize=10'      # 所有前台 user 的錢包（wallet:read）
+curl -H "token: <token>" http://localhost:8080/users/1                              # 前台 user（user:read）
+curl -H "token: <token>" 'http://localhost:8080/users?pageNum=1&pageSize=5'         # 前台 user 列表（user:read）
+curl -H "token: <token>" 'http://localhost:8080/admin-users?pageNum=1&pageSize=10'  # 後台 user 列表含角色（admin_user:read）
+curl -H "token: <token>" http://localhost:8080/roles                                # 角色與權限清單（admin_user:read）
+curl -X POST -H "token: <token>" http://localhost:8080/admin-users -d '{"username":"viewer1","password":"viewer123","role_ids":[2]}'  # 建後台帳號（admin_user:write）
+curl -X PUT -H "token: <token>" http://localhost:8080/admin-users/2/roles -d '{"role_ids":[1,2]}'  # 指派角色，整組取代（admin_user:write）
 ```
 
 ## Roadmap（尚未實作）
@@ -96,8 +101,11 @@ curl -H "token: <token>" 'http://localhost:8080/admin-users?pageNum=1&pageSize=1
 - [x] **前台/後台 user 分離** — 本專案定位是後台系統：`admin_users` 表（登入、改密碼、
       session 都走它，migration 含種子帳號 admin/admin123）；`users` 表為前台 user
       （公開註冊 + 錢包），後台只做查詢
-- [ ] **RBAC 權限控制** — roles / permissions / user_roles 表 + `permMiddleware("user:delete")`
-      權限中介層；權限清單登入時放進 Redis session。開工前先對齊既有 Java 系統的權限表結構
+- [x] **RBAC 權限控制** — roles / permissions / role_permissions / admin_user_roles 四表 +
+      `permMiddleware("user:read")` 權限中介層（code 用 resource:action，`*` 萬用）；
+      權限快照登入時放進 Redis session，每個 request 零 DB 查詢（改角色需重新登入生效）。
+      後台可建帳號、指派角色（整組取代）；角色/權限本身唯讀，異動用 migration/SQL 管。
+      之後對齊既有 Java 系統的權限表結構時，只需要搬表和資料，middleware 判斷邏輯不動
 - [x] **`/readyz` readiness 端點** — ping DB/Redis，給 LB / ASG(ELB health check) /
       k8s readiness probe 判斷「這台能不能收流量」；依賴掛了是摘流量等恢復，不是自殺重啟
 - [x] **Session 補完** — sliding TTL（活躍使用者自動續期，不會用到一半被登出）+

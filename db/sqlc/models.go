@@ -16,6 +16,11 @@ type AdminUser struct {
 	CreatedAt      time.Time `json:"created_at"`
 }
 
+type AdminUserRole struct {
+	AdminUserID int64 `json:"admin_user_id"`
+	RoleID      int64 `json:"role_id"`
+}
+
 type OperationLog struct {
 	ID          int64         `json:"id"`
 	UserID      sql.NullInt64 `json:"user_id"`
@@ -26,6 +31,25 @@ type OperationLog struct {
 	StatusCode  int32         `json:"status_code"`
 	RequestID   string        `json:"request_id"`
 	CreatedAt   time.Time     `json:"created_at"`
+}
+
+type Permission struct {
+	ID          int64     `json:"id"`
+	Code        string    `json:"code"`
+	Description string    `json:"description"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+type Role struct {
+	ID          int64     `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+type RolePermission struct {
+	RoleID       int64 `json:"role_id"`
+	PermissionID int64 `json:"permission_id"`
 }
 
 type User struct {

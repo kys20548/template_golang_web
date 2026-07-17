@@ -1,3 +1,11 @@
+-- name: CreateAdminUser :one
+INSERT INTO admin_users (
+    username,
+    hashed_password
+) VALUES (
+    $1, $2
+) RETURNING *;
+
 -- name: GetAdminUser :one
 SELECT * FROM admin_users
 WHERE id = $1 LIMIT 1;

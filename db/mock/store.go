@@ -102,6 +102,50 @@ func (mr *MockStoreMockRecorder) CountWallets(ctx any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountWallets", reflect.TypeOf((*MockStore)(nil).CountWallets), ctx)
 }
 
+// CreateAdminUser mocks base method.
+func (m *MockStore) CreateAdminUser(ctx context.Context, arg db.CreateAdminUserParams) (db.AdminUser, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateAdminUser", ctx, arg)
+	ret0, _ := ret[0].(db.AdminUser)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateAdminUser indicates an expected call of CreateAdminUser.
+func (mr *MockStoreMockRecorder) CreateAdminUser(ctx, arg any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateAdminUser", reflect.TypeOf((*MockStore)(nil).CreateAdminUser), ctx, arg)
+}
+
+// CreateAdminUserRole mocks base method.
+func (m *MockStore) CreateAdminUserRole(ctx context.Context, arg db.CreateAdminUserRoleParams) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateAdminUserRole", ctx, arg)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CreateAdminUserRole indicates an expected call of CreateAdminUserRole.
+func (mr *MockStoreMockRecorder) CreateAdminUserRole(ctx, arg any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateAdminUserRole", reflect.TypeOf((*MockStore)(nil).CreateAdminUserRole), ctx, arg)
+}
+
+// CreateAdminUserTx mocks base method.
+func (m *MockStore) CreateAdminUserTx(ctx context.Context, arg db.CreateAdminUserTxParams) (db.CreateAdminUserTxResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateAdminUserTx", ctx, arg)
+	ret0, _ := ret[0].(db.CreateAdminUserTxResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateAdminUserTx indicates an expected call of CreateAdminUserTx.
+func (mr *MockStoreMockRecorder) CreateAdminUserTx(ctx, arg any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateAdminUserTx", reflect.TypeOf((*MockStore)(nil).CreateAdminUserTx), ctx, arg)
+}
+
 // CreateOperationLog mocks base method.
 func (m *MockStore) CreateOperationLog(ctx context.Context, arg db.CreateOperationLogParams) (db.OperationLog, error) {
 	m.ctrl.T.Helper()
@@ -160,6 +204,20 @@ func (m *MockStore) CreateWallet(ctx context.Context, userID int64) (db.Wallet, 
 func (mr *MockStoreMockRecorder) CreateWallet(ctx, userID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateWallet", reflect.TypeOf((*MockStore)(nil).CreateWallet), ctx, userID)
+}
+
+// DeleteAdminUserRoles mocks base method.
+func (m *MockStore) DeleteAdminUserRoles(ctx context.Context, adminUserID int64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteAdminUserRoles", ctx, adminUserID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteAdminUserRoles indicates an expected call of DeleteAdminUserRoles.
+func (mr *MockStoreMockRecorder) DeleteAdminUserRoles(ctx, adminUserID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteAdminUserRoles", reflect.TypeOf((*MockStore)(nil).DeleteAdminUserRoles), ctx, adminUserID)
 }
 
 // DeleteOperationLogsBefore mocks base method.
@@ -251,6 +309,21 @@ func (mr *MockStoreMockRecorder) GetUserByUsername(ctx, username any) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserByUsername", reflect.TypeOf((*MockStore)(nil).GetUserByUsername), ctx, username)
 }
 
+// ListAdminUserRoles mocks base method.
+func (m *MockStore) ListAdminUserRoles(ctx context.Context) ([]db.ListAdminUserRolesRow, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListAdminUserRoles", ctx)
+	ret0, _ := ret[0].([]db.ListAdminUserRolesRow)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListAdminUserRoles indicates an expected call of ListAdminUserRoles.
+func (mr *MockStoreMockRecorder) ListAdminUserRoles(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAdminUserRoles", reflect.TypeOf((*MockStore)(nil).ListAdminUserRoles), ctx)
+}
+
 // ListAdminUsers mocks base method.
 func (m *MockStore) ListAdminUsers(ctx context.Context, arg db.ListAdminUsersParams) ([]db.AdminUser, error) {
 	m.ctrl.T.Helper()
@@ -279,6 +352,51 @@ func (m *MockStore) ListOperationLogs(ctx context.Context, arg db.ListOperationL
 func (mr *MockStoreMockRecorder) ListOperationLogs(ctx, arg any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListOperationLogs", reflect.TypeOf((*MockStore)(nil).ListOperationLogs), ctx, arg)
+}
+
+// ListPermissionCodesByAdminUserID mocks base method.
+func (m *MockStore) ListPermissionCodesByAdminUserID(ctx context.Context, adminUserID int64) ([]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListPermissionCodesByAdminUserID", ctx, adminUserID)
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListPermissionCodesByAdminUserID indicates an expected call of ListPermissionCodesByAdminUserID.
+func (mr *MockStoreMockRecorder) ListPermissionCodesByAdminUserID(ctx, adminUserID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPermissionCodesByAdminUserID", reflect.TypeOf((*MockStore)(nil).ListPermissionCodesByAdminUserID), ctx, adminUserID)
+}
+
+// ListRolePermissions mocks base method.
+func (m *MockStore) ListRolePermissions(ctx context.Context) ([]db.ListRolePermissionsRow, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListRolePermissions", ctx)
+	ret0, _ := ret[0].([]db.ListRolePermissionsRow)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListRolePermissions indicates an expected call of ListRolePermissions.
+func (mr *MockStoreMockRecorder) ListRolePermissions(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRolePermissions", reflect.TypeOf((*MockStore)(nil).ListRolePermissions), ctx)
+}
+
+// ListRoles mocks base method.
+func (m *MockStore) ListRoles(ctx context.Context) ([]db.Role, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListRoles", ctx)
+	ret0, _ := ret[0].([]db.Role)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListRoles indicates an expected call of ListRoles.
+func (mr *MockStoreMockRecorder) ListRoles(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRoles", reflect.TypeOf((*MockStore)(nil).ListRoles), ctx)
 }
 
 // ListUsers mocks base method.
@@ -337,6 +455,20 @@ func (m *MockStore) UpdateAdminUserPassword(ctx context.Context, arg db.UpdateAd
 func (mr *MockStoreMockRecorder) UpdateAdminUserPassword(ctx, arg any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateAdminUserPassword", reflect.TypeOf((*MockStore)(nil).UpdateAdminUserPassword), ctx, arg)
+}
+
+// UpdateAdminUserRolesTx mocks base method.
+func (m *MockStore) UpdateAdminUserRolesTx(ctx context.Context, arg db.UpdateAdminUserRolesTxParams) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateAdminUserRolesTx", ctx, arg)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateAdminUserRolesTx indicates an expected call of UpdateAdminUserRolesTx.
+func (mr *MockStoreMockRecorder) UpdateAdminUserRolesTx(ctx, arg any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateAdminUserRolesTx", reflect.TypeOf((*MockStore)(nil).UpdateAdminUserRolesTx), ctx, arg)
 }
 
 // UpdateUserPassword mocks base method.

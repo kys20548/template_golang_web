@@ -51,6 +51,34 @@ TOKEN=$(curl -s -X POST localhost:8080/login -d '{"username":"admin","password":
 curl -H "token: $TOKEN" localhost:8080/me
 ```
 
+## RBAC 權限控制
+
+標準四表：`roles`、`permissions`、`role_permissions`、`admin_user_roles`
+（migration 000006，seed super_admin/viewer 兩角色 + 權限，admin 綁 super_admin）。
+不走「admin_users 加 role 欄位 + 權限寫死在 code」的極簡路線，
+是因為之後要對齊既有 Java 系統的權限表（幾乎必是四表同構）——
+現在就同構，屆時只要搬表搬資料，middleware 與判斷邏輯全不用動。
+
+**permission code** 用 `resource:action`（`user:read`、`admin_user:write`…），
+`*` 為萬用（super_admin 專用）。粒度刻意粗：一個資源一兩個 code，
+真有更細需求（欄位級、資料列級）再說。
+
+**判斷流程**：
+- 登入時查一次 DB（admin_user → roles → permission codes），
+  快照進 session 的 `AuthUser.Permissions`——之後每個 request 零 DB 查詢
+- `permMiddleware("user:read")` 掛在個別路由上（authMiddleware 之後），
+  宣告式、跟路由定義放在一起一眼可讀；沒權限回 403 + 10007
+- `/me`、`/logout`、`/me/password` 只要登入就能用，不掛權限
+
+**取捨（同 session 設計）**：權限是登入時的快照，改角色要對方重新登入才生效。
+後台帳號少、權限異動罕見，可接受；要即時生效時加 user → tokens 反查索引，
+在指派角色後把該 user 的 session 全刪掉。
+
+**管理範圍刻意收斂**：後台可建帳號（`POST /admin-users`，transaction 內同時指派角色）、
+指派角色（`PUT /admin-users/:id/roles`，整組取代）；角色與權限本身唯讀
+（`GET /roles`），異動用 migration/SQL 管——角色 CRUD + 勾權限的 UI
+等有實際需求再加。
+
 ## Request ID 貫穿鏈路
 
 `requestIDMiddleware` 為每個請求產生 UUID（client 有帶 `X-Request-Id` 就沿用，

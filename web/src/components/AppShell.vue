@@ -1,13 +1,29 @@
 <script setup>
-import { onMounted, provide, ref } from 'vue'
+import { computed, onMounted, provide, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { request } from '../api/client'
 import { clearSession } from '../auth/session'
+import { hasPerm } from '../auth/perm'
 
 const user = ref(null)
 const router = useRouter()
 
 provide('authUser', user)
+
+// 選單依登入者權限顯示；perm 為 null 代表登入就能看
+const navItems = [
+  { to: '/dashboard', label: '首頁', perm: null },
+  { to: '/users', label: '前台使用者', perm: 'user:read' },
+  { to: '/admin-users', label: '後台使用者', perm: 'admin_user:read' },
+  { to: '/roles', label: '角色與權限', perm: 'admin_user:read' },
+  { to: '/wallets', label: '錢包', perm: 'wallet:read' },
+  { to: '/operation-logs', label: '操作日誌', perm: 'operation_log:read' },
+  { to: '/me/password', label: '修改密碼', perm: null },
+]
+
+const visibleNavItems = computed(() =>
+  navItems.filter((item) => !item.perm || hasPerm(user.value, item.perm)),
+)
 
 onMounted(async () => {
   try {
@@ -36,12 +52,9 @@ async function onLogout() {
         <span>tgw-admin</span>
       </div>
       <nav class="nav">
-        <router-link to="/dashboard">首頁</router-link>
-        <router-link to="/users">前台使用者</router-link>
-        <router-link to="/admin-users">後台使用者</router-link>
-        <router-link to="/wallets">錢包</router-link>
-        <router-link to="/operation-logs">操作日誌</router-link>
-        <router-link to="/me/password">修改密碼</router-link>
+        <router-link v-for="item in visibleNavItems" :key="item.to" :to="item.to">
+          {{ item.label }}
+        </router-link>
       </nav>
     </aside>
     <div class="main">

@@ -28,7 +28,7 @@ const docTemplate = `{
                 "tags": [
                     "admin-user"
                 ],
-                "summary": "後台使用者列表",
+                "summary": "後台使用者列表（含角色）",
                 "parameters": [
                     {
                         "type": "integer",
@@ -67,7 +67,7 @@ const docTemplate = `{
                                                         "list": {
                                                             "type": "array",
                                                             "items": {
-                                                                "$ref": "#/definitions/api.adminUserResponse"
+                                                                "$ref": "#/definitions/api.adminUserWithRolesResponse"
                                                             }
                                                         }
                                                     }
@@ -77,6 +77,99 @@ const docTemplate = `{
                                     }
                                 }
                             ]
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "TokenAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-user"
+                ],
+                "summary": "建立後台使用者",
+                "parameters": [
+                    {
+                        "description": "帳號、密碼與角色",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.createAdminUserRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/api.adminUserResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/admin-users/{id}/roles": {
+            "put": {
+                "security": [
+                    {
+                        "TokenAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-user"
+                ],
+                "summary": "指派後台使用者角色（整組取代）",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "後台使用者 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "角色 ID 清單（空陣列 = 清空角色）",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.updateAdminUserRolesRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.Response"
                         }
                     }
                 }
@@ -366,6 +459,45 @@ const docTemplate = `{
                 }
             }
         },
+        "/roles": {
+            "get": {
+                "security": [
+                    {
+                        "TokenAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-user"
+                ],
+                "summary": "角色列表（含權限）",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/api.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/api.roleResponse"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/users": {
             "get": {
                 "security": [
@@ -593,6 +725,12 @@ const docTemplate = `{
         "api.AuthUser": {
             "type": "object",
             "properties": {
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "user_id": {
                     "type": "integer"
                 },
@@ -642,6 +780,26 @@ const docTemplate = `{
                 }
             }
         },
+        "api.adminUserWithRolesResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "roles": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.roleBrief"
+                    }
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
         "api.changePasswordRequest": {
             "type": "object",
             "required": [
@@ -656,6 +814,28 @@ const docTemplate = `{
                 "old_password": {
                     "type": "string",
                     "minLength": 6
+                }
+            }
+        },
+        "api.createAdminUserRequest": {
+            "type": "object",
+            "required": [
+                "password",
+                "username"
+            ],
+            "properties": {
+                "password": {
+                    "type": "string",
+                    "minLength": 6
+                },
+                "role_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "username": {
+                    "type": "string"
                 }
             }
         },
@@ -749,6 +929,51 @@ const docTemplate = `{
                 }
             }
         },
+        "api.roleBrief": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.roleResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "api.updateAdminUserRolesRequest": {
+            "type": "object",
+            "properties": {
+                "role_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
         "api.userResponse": {
             "type": "object",
             "properties": {
@@ -816,6 +1041,7 @@ const docTemplate = `{
                 10004,
                 10005,
                 10006,
+                10007,
                 20001,
                 20002,
                 20003,
@@ -829,6 +1055,7 @@ const docTemplate = `{
                 "ErrNotFound",
                 "ErrTimeout",
                 "ErrNotReady",
+                "ErrForbidden",
                 "ErrUserNotFound",
                 "ErrUserExists",
                 "ErrWrongCredentials",

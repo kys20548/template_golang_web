@@ -49,6 +49,11 @@ func TestLoginAPI(t *testing.T) {
 					GetAdminUserByUsername(gomock.Any(), gomock.Eq(user.Username)).
 					Times(1).
 					Return(user, nil)
+				// 登入成功會撈權限快照放進 session
+				store.EXPECT().
+					ListPermissionCodesByAdminUserID(gomock.Any(), gomock.Eq(user.ID)).
+					Times(1).
+					Return([]string{"*"}, nil)
 				// 登入成功：清除失敗計數 + 寫入 session
 				// （token 是隨機 UUID，key 無法預測，用 Any）
 				cacheMock.EXPECT().

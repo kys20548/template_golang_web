@@ -404,6 +404,33 @@ tbody tr:last-child td {
 .status-ok { color: var(--success); }
 .status-fail { color: var(--danger); }
 
+.role-badge {
+  color: var(--accent);
+  background: var(--accent-soft);
+  margin-right: var(--space-1);
+}
+
+.perm-badge {
+  color: var(--ink-soft);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  font-weight: 500;
+  margin-right: var(--space-1);
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 14px;
+  color: var(--ink);
+  margin-bottom: var(--space-1);
+}
+
+.checkbox-row input {
+  width: auto;
+}
+
 /* ---- 分頁 ---- */
 
 .pagination {

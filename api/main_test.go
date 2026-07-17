@@ -98,10 +98,16 @@ func testAdminUser(t *testing.T) (db.AdminUser, string) {
 	}, password
 }
 
+// toAuthUser 產生登入態：預設帶萬用權限，權限相關測試另用 toAuthUserWithPerms。
 func toAuthUser(user db.AdminUser) AuthUser {
+	return toAuthUserWithPerms(user, []string{"*"})
+}
+
+func toAuthUserWithPerms(user db.AdminUser, permissions []string) AuthUser {
 	return AuthUser{
-		UserID:   user.ID,
-		Username: user.Username,
+		UserID:      user.ID,
+		Username:    user.Username,
+		Permissions: permissions,
 	}
 }
 

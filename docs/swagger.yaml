@@ -2,6 +2,10 @@ basePath: /
 definitions:
   api.AuthUser:
     properties:
+      permissions:
+        items:
+          type: string
+        type: array
       user_id:
         type: integer
       username:
@@ -34,6 +38,19 @@ definitions:
       username:
         type: string
     type: object
+  api.adminUserWithRolesResponse:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      roles:
+        items:
+          $ref: '#/definitions/api.roleBrief'
+        type: array
+      username:
+        type: string
+    type: object
   api.changePasswordRequest:
     properties:
       new_password:
@@ -45,6 +62,21 @@ definitions:
     required:
     - new_password
     - old_password
+    type: object
+  api.createAdminUserRequest:
+    properties:
+      password:
+        minLength: 6
+        type: string
+      role_ids:
+        items:
+          type: integer
+        type: array
+      username:
+        type: string
+    required:
+    - password
+    - username
     type: object
   api.createUserRequest:
     properties:
@@ -106,6 +138,35 @@ definitions:
       username:
         type: string
     type: object
+  api.roleBrief:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
+  api.roleResponse:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      permissions:
+        items:
+          type: string
+        type: array
+    type: object
+  api.updateAdminUserRolesRequest:
+    properties:
+      role_ids:
+        items:
+          type: integer
+        type: array
+    type: object
   api.userResponse:
     properties:
       created_at:
@@ -152,6 +213,7 @@ definitions:
     - 10004
     - 10005
     - 10006
+    - 10007
     - 20001
     - 20002
     - 20003
@@ -165,6 +227,7 @@ definitions:
     - ErrNotFound
     - ErrTimeout
     - ErrNotReady
+    - ErrForbidden
     - ErrUserNotFound
     - ErrUserExists
     - ErrWrongCredentials
@@ -204,13 +267,68 @@ paths:
                   - properties:
                       list:
                         items:
-                          $ref: '#/definitions/api.adminUserResponse'
+                          $ref: '#/definitions/api.adminUserWithRolesResponse'
                         type: array
                     type: object
               type: object
       security:
       - TokenAuth: []
-      summary: 後台使用者列表
+      summary: 後台使用者列表（含角色）
+      tags:
+      - admin-user
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 帳號、密碼與角色
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.createAdminUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/api.adminUserResponse'
+              type: object
+      security:
+      - TokenAuth: []
+      summary: 建立後台使用者
+      tags:
+      - admin-user
+  /admin-users/{id}/roles:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: 後台使用者 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 角色 ID 清單（空陣列 = 清空角色）
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.updateAdminUserRolesRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.Response'
+      security:
+      - TokenAuth: []
+      summary: 指派後台使用者角色（整組取代）
       tags:
       - admin-user
   /healthz:
@@ -374,6 +492,27 @@ paths:
       summary: Readiness 檢查（含 DB/Redis 連線）
       tags:
       - system
+  /roles:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/api.roleResponse'
+                  type: array
+              type: object
+      security:
+      - TokenAuth: []
+      summary: 角色列表（含權限）
+      tags:
+      - admin-user
   /users:
     get:
       parameters:
