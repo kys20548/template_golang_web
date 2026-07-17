@@ -1,8 +1,8 @@
 <script setup>
-import { computed, onMounted, provide, ref } from 'vue'
+import { computed, onMounted, onUnmounted, provide, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { request } from '../api/client'
-import { clearSession } from '../auth/session'
+import { clearSession, TOKEN_KEY } from '../auth/session'
 import { hasPerm } from '../auth/perm'
 
 const user = ref(null)
@@ -25,14 +25,32 @@ const visibleNavItems = computed(() =>
   navItems.filter((item) => !item.perm || hasPerm(user.value, item.perm)),
 )
 
-onMounted(async () => {
+async function syncUser() {
   try {
     user.value = await request('/me')
   } catch {
     clearSession()
     router.push('/login')
   }
+}
+
+// token 存在 localStorage，同網域所有分頁共用：另一個分頁換人登入（或登出）後，
+// 本分頁畫面上的按鈕/選單還是舊身分的快照，跟實際送出的 token 對不上。
+// storage 事件只在「別的分頁」改動時觸發，用它重新同步登入者。
+function onStorageChange(e) {
+  if (e.key !== TOKEN_KEY) return
+  if (!e.newValue) {
+    router.push('/login')
+    return
+  }
+  syncUser()
+}
+
+onMounted(() => {
+  syncUser()
+  window.addEventListener('storage', onStorageChange)
 })
+onUnmounted(() => window.removeEventListener('storage', onStorageChange))
 
 async function onLogout() {
   try {
