@@ -125,10 +125,20 @@ curl -X PUT    -H "token: <token>" http://localhost:8080/admin-users/2/restore  
 - [x] **Render 部署 demo**（Postgres + Redis + Web Service + Static Site）
       — migration 隨容器啟動自動跑、CORS 收斂、production 模式；細節與免費方案的
       限制（Postgres 30 天到期、Pre-Deploy Command 鎖付費方案）見 NOTES「Render 部署」
+- [ ] **錢包加扣款** — 帳本表 `wallet_entries`（金額正負、備註、操作者、時間），
+      加減與餘額檢查用單句 `UPDATE ... SET balance = balance + $1 ... AND balance + $1 >= 0`
+      保證併發安全（不夠扣回 30001 餘額不足，錢包錯誤碼 3xxxx 段啟用）；
+      新權限 `wallet:write`；web 加「加款/扣款」彈窗 + 異動明細列表頁；補併發測試
+- [ ] **首頁 Dashboard 統計卡片** — 前台使用者數、錢包總餘額、今日操作數等，
+      讓後台首頁不再只是導覽卡
+- [ ] **Prometheus + Grafana 監控**（本地/demo 環境，Render 跑不了 sidecar）—
+      gin middleware 收 request duration histogram（路由/狀態碼 label）、
+      `/metrics` 不對外（獨立 port 或不過 CORS）、asynq exporter、
+      業務指標（登入成功/失敗、錢包異動）；Prometheus + Grafana 進 docker compose，
+      Grafana dashboard 用 provisioning 檔案進版控
 - [ ] **kafka** — 有實際場景再加；原則：獨立 goroutine 執行、
       掛掉只記 log 不拖垮 HTTP server，graceful shutdown 時一併優雅關閉
 
-明確不做（模板定位是 code，運維交給部署方）：log 收集/alerting、secrets 管理、
-`/metrics`、壓測。
+明確不做（模板定位是 code，運維交給部署方）：log 收集/alerting、secrets 管理、壓測。
 
 已完成項目的演進紀錄與設計細節見 [NOTES.md](NOTES.md)。
