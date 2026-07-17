@@ -10,10 +10,11 @@ import (
 )
 
 type AdminUser struct {
-	ID             int64     `json:"id"`
-	Username       string    `json:"username"`
-	HashedPassword string    `json:"hashed_password"`
-	CreatedAt      time.Time `json:"created_at"`
+	ID             int64        `json:"id"`
+	Username       string       `json:"username"`
+	HashedPassword string       `json:"hashed_password"`
+	CreatedAt      time.Time    `json:"created_at"`
+	DeletedAt      sql.NullTime `json:"deleted_at"`
 }
 
 type AdminUserRole struct {
@@ -53,11 +54,12 @@ type RolePermission struct {
 }
 
 type User struct {
-	ID             int64     `json:"id"`
-	Username       string    `json:"username"`
-	Email          string    `json:"email"`
-	CreatedAt      time.Time `json:"created_at"`
-	HashedPassword string    `json:"hashed_password"`
+	ID             int64        `json:"id"`
+	Username       string       `json:"username"`
+	Email          string       `json:"email"`
+	CreatedAt      time.Time    `json:"created_at"`
+	HashedPassword string       `json:"hashed_password"`
+	DeletedAt      sql.NullTime `json:"deleted_at"`
 }
 
 type Wallet struct {

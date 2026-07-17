@@ -43,6 +43,12 @@ const docTemplate = `{
                         "name": "pageSize",
                         "in": "query",
                         "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "是否包含已刪除者",
+                        "name": "includeDeleted",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -125,6 +131,96 @@ const docTemplate = `{
                                     }
                                 }
                             ]
+                        }
+                    }
+                }
+            }
+        },
+        "/admin-users/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "TokenAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-user"
+                ],
+                "summary": "刪除後台使用者（軟刪除，session 立即失效）",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "後台使用者 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "不能刪除自己",
+                        "schema": {
+                            "$ref": "#/definitions/api.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "使用者不存在或已刪除",
+                        "schema": {
+                            "$ref": "#/definitions/api.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin-users/{id}/restore": {
+            "put": {
+                "security": [
+                    {
+                        "TokenAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-user"
+                ],
+                "summary": "還原後台使用者",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "後台使用者 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "使用者不存在或未被刪除",
+                        "schema": {
+                            "$ref": "#/definitions/api.Response"
+                        }
+                    },
+                    "409": {
+                        "description": "帳號名已被重新建立",
+                        "schema": {
+                            "$ref": "#/definitions/api.Response"
                         }
                     }
                 }
@@ -526,6 +622,12 @@ const docTemplate = `{
                         "name": "pageSize",
                         "in": "query",
                         "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "是否包含已刪除者",
+                        "name": "includeDeleted",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -651,6 +753,88 @@ const docTemplate = `{
                         }
                     }
                 }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "TokenAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user"
+                ],
+                "summary": "刪除前台使用者（軟刪除）",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "使用者 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "使用者不存在或已刪除",
+                        "schema": {
+                            "$ref": "#/definitions/api.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/users/{id}/restore": {
+            "put": {
+                "security": [
+                    {
+                        "TokenAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user"
+                ],
+                "summary": "還原前台使用者",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "使用者 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "使用者不存在或未被刪除",
+                        "schema": {
+                            "$ref": "#/definitions/api.Response"
+                        }
+                    },
+                    "409": {
+                        "description": "帳號名或 email 已被重新註冊",
+                        "schema": {
+                            "$ref": "#/definitions/api.Response"
+                        }
+                    }
+                }
             }
         },
         "/wallets": {
@@ -772,6 +956,9 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
+                "deleted_at": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "integer"
                 },
@@ -784,6 +971,9 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "created_at": {
+                    "type": "string"
+                },
+                "deleted_at": {
                     "type": "string"
                 },
                 "id": {
@@ -980,6 +1170,9 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
+                "deleted_at": {
+                    "type": "string"
+                },
                 "email": {
                     "type": "string"
                 },
@@ -1045,7 +1238,8 @@ const docTemplate = `{
                 20001,
                 20002,
                 20003,
-                20004
+                20004,
+                20005
             ],
             "x-enum-varnames": [
                 "Success",
@@ -1059,7 +1253,8 @@ const docTemplate = `{
                 "ErrUserNotFound",
                 "ErrUserExists",
                 "ErrWrongCredentials",
-                "ErrTooManyLoginFails"
+                "ErrTooManyLoginFails",
+                "ErrCannotDeleteSelf"
             ]
         }
     },

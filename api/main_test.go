@@ -57,10 +57,14 @@ func setupAuth(t *testing.T, request *http.Request, cacheMock *mockcache.MockCac
 		Times(1).
 		Return(string(payload), nil)
 
-	// sliding TTL：驗證通過後 authMiddleware 會續期 session，
+	// sliding TTL：驗證通過後 authMiddleware 會續期 session 與反查索引，
 	// 對測試本體不重要，一律放行
 	cacheMock.EXPECT().
 		Expire(gomock.Any(), sessionKey(token), gomock.Any()).
+		AnyTimes().
+		Return(nil)
+	cacheMock.EXPECT().
+		Expire(gomock.Any(), adminSessionKey(user.UserID), gomock.Any()).
 		AnyTimes().
 		Return(nil)
 

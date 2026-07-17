@@ -12,13 +12,16 @@ const pageSize = ref(10)
 const total = ref(0)
 const list = ref([])
 const error = ref('')
+const includeDeleted = ref(false)
 
 const roles = ref([])
 
 async function fetchList() {
   error.value = ''
   try {
-    const data = await request(`/admin-users?pageNum=${pageNum.value}&pageSize=${pageSize.value}`)
+    const data = await request(
+      `/admin-users?pageNum=${pageNum.value}&pageSize=${pageSize.value}&includeDeleted=${includeDeleted.value}`,
+    )
     list.value = data.list
     total.value = data.total
   } catch (e) {
@@ -35,6 +38,10 @@ async function fetchRoles() {
 }
 
 watch(pageNum, fetchList)
+watch(includeDeleted, () => {
+  pageNum.value = 1
+  fetchList()
+})
 onMounted(() => {
   fetchList()
   fetchRoles()
@@ -100,14 +107,48 @@ async function onSaveRoles() {
     saving.value = false
   }
 }
+
+// 刪除／還原：刪除採兩段式確認（第一下變「確認刪除」），不能刪自己；
+// 刪除成功後對方的 session 會被後端立即踢下線
+const confirmDeleteId = ref(null)
+const actionError = ref('')
+
+async function onDelete(user) {
+  if (confirmDeleteId.value !== user.id) {
+    confirmDeleteId.value = user.id
+    return
+  }
+  actionError.value = ''
+  try {
+    await request(`/admin-users/${user.id}`, { method: 'DELETE' })
+    confirmDeleteId.value = null
+    fetchList()
+  } catch (e) {
+    actionError.value = e.message
+  }
+}
+
+async function onRestore(user) {
+  actionError.value = ''
+  try {
+    await request(`/admin-users/${user.id}/restore`, { method: 'PUT' })
+    fetchList()
+  } catch (e) {
+    actionError.value = e.message
+  }
+}
 </script>
 
 <template>
   <h1>後台使用者</h1>
   <p class="muted">可登入本後台系統的帳號。角色異動要等對方重新登入才生效。</p>
 
-  <div class="toolbar" v-if="canWrite">
-    <button v-if="!showCreate" @click="showCreate = true">新增後台使用者</button>
+  <div class="toolbar">
+    <button v-if="canWrite && !showCreate" @click="showCreate = true">新增後台使用者</button>
+    <label class="checkbox-row" style="margin-left: auto">
+      <input type="checkbox" v-model="includeDeleted" />
+      含已刪除
+    </label>
   </div>
 
   <div class="card" v-if="showCreate" style="max-width: 420px; margin-bottom: var(--space-4)">
@@ -135,6 +176,7 @@ async function onSaveRoles() {
 
   <p v-if="error" role="alert">{{ error }}</p>
   <div class="table-wrap" v-else>
+    <p v-if="actionError" role="alert">{{ actionError }}</p>
     <table>
       <thead>
         <tr>
@@ -148,14 +190,30 @@ async function onSaveRoles() {
       <tbody>
         <tr v-for="u in list" :key="u.id">
           <td class="mono">{{ u.id }}</td>
-          <td>{{ u.username }}</td>
+          <td>
+            {{ u.username }}
+            <span v-if="u.deleted_at" class="badge deleted-badge">已刪除</span>
+          </td>
           <td>
             <span v-if="!u.roles.length" class="muted">—</span>
             <span v-for="role in u.roles" :key="role.id" class="badge role-badge">{{ role.name }}</span>
           </td>
           <td class="mono">{{ new Date(u.created_at).toLocaleString() }}</td>
           <td v-if="canWrite">
-            <button class="secondary" @click="startEdit(u)">指派角色</button>
+            <template v-if="u.deleted_at">
+              <button class="secondary" @click="onRestore(u)">還原</button>
+            </template>
+            <template v-else>
+              <button class="secondary" @click="startEdit(u)">指派角色</button>
+              <button
+                v-if="u.id !== authUser?.user_id"
+                class="danger"
+                style="margin-left: var(--space-2)"
+                @click="onDelete(u)"
+              >
+                {{ confirmDeleteId === u.id ? '確認刪除' : '刪除' }}
+              </button>
+            </template>
           </td>
         </tr>
       </tbody>

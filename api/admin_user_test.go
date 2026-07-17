@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kys20548/template_golang_web/cache"
 	mockcache "github.com/kys20548/template_golang_web/cache/mock"
 	mockdb "github.com/kys20548/template_golang_web/db/mock"
 	db "github.com/kys20548/template_golang_web/db/sqlc"
@@ -39,11 +40,11 @@ func TestListAdminUsersAPI(t *testing.T) {
 			url:  "/admin-users?pageNum=1&pageSize=10",
 			buildStubs: func(store *mockdb.MockStore) {
 				store.EXPECT().
-					ListAdminUsers(gomock.Any(), gomock.Eq(db.ListAdminUsersParams{Limit: 10, Offset: 0})).
+					ListAdminUsers(gomock.Any(), gomock.Eq(db.ListAdminUsersParams{PageLimit: 10, PageOffset: 0})).
 					Times(1).
 					Return(adminUsers, nil)
 				store.EXPECT().
-					CountAdminUsers(gomock.Any()).
+					CountAdminUsers(gomock.Any(), gomock.Eq(false)).
 					Times(1).
 					Return(int64(2), nil)
 				// 角色關聯一次撈全部，handler 在記憶體組裝；operator 沒角色
@@ -147,7 +148,7 @@ func TestPermMiddleware(t *testing.T) {
 					ListAdminUsers(gomock.Any(), gomock.Any()).
 					Times(1).
 					Return([]db.AdminUser{}, nil)
-				store.EXPECT().CountAdminUsers(gomock.Any()).Times(1).Return(int64(0), nil)
+				store.EXPECT().CountAdminUsers(gomock.Any(), gomock.Any()).Times(1).Return(int64(0), nil)
 				store.EXPECT().ListAdminUserRoles(gomock.Any()).Times(1).Return(nil, nil)
 			},
 			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
@@ -162,7 +163,7 @@ func TestPermMiddleware(t *testing.T) {
 					ListAdminUsers(gomock.Any(), gomock.Any()).
 					Times(1).
 					Return([]db.AdminUser{}, nil)
-				store.EXPECT().CountAdminUsers(gomock.Any()).Times(1).Return(int64(0), nil)
+				store.EXPECT().CountAdminUsers(gomock.Any(), gomock.Any()).Times(1).Return(int64(0), nil)
 				store.EXPECT().ListAdminUserRoles(gomock.Any()).Times(1).Return(nil, nil)
 			},
 			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
@@ -451,4 +452,187 @@ func TestListRolesAPI(t *testing.T) {
 	require.Len(t, got, 2)
 	require.Equal(t, []string{"*"}, got[0].Permissions)
 	require.Equal(t, []string{"operation_log:read", "user:read"}, got[1].Permissions)
+}
+
+func TestDeleteAdminUserAPI(t *testing.T) {
+	adminUser, _ := testAdminUser(t) // 操作者 ID=1
+
+	testCases := []struct {
+		name          string
+		url           string
+		buildStubs    func(store *mockdb.MockStore, cacheMock *mockcache.MockCache)
+		checkResponse func(t *testing.T, recorder *httptest.ResponseRecorder)
+	}{
+		{
+			// 刪除成功後要透過反查索引把對方 session 踢下線
+			name: "OKAndKicksSession",
+			url:  "/admin-users/2",
+			buildStubs: func(store *mockdb.MockStore, cacheMock *mockcache.MockCache) {
+				store.EXPECT().
+					SoftDeleteAdminUser(gomock.Any(), gomock.Eq(int64(2))).
+					Times(1).
+					Return(int64(1), nil)
+				cacheMock.EXPECT().
+					Get(gomock.Any(), gomock.Eq(adminSessionKey(2))).
+					Times(1).
+					Return("victim-token", nil)
+				cacheMock.EXPECT().
+					Del(gomock.Any(), gomock.Eq(sessionKey("victim-token")), gomock.Eq(adminSessionKey(2))).
+					Times(1).
+					Return(nil)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusOK, recorder.Code)
+				require.Equal(t, errcode.Success, parseResponse(t, recorder.Body, nil))
+			},
+		},
+		{
+			// 對方沒登入（反查索引不存在）：不算錯，正常回成功
+			name: "OKNoActiveSession",
+			url:  "/admin-users/2",
+			buildStubs: func(store *mockdb.MockStore, cacheMock *mockcache.MockCache) {
+				store.EXPECT().
+					SoftDeleteAdminUser(gomock.Any(), gomock.Eq(int64(2))).
+					Times(1).
+					Return(int64(1), nil)
+				cacheMock.EXPECT().
+					Get(gomock.Any(), gomock.Eq(adminSessionKey(2))).
+					Times(1).
+					Return("", cache.ErrNotFound)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusOK, recorder.Code)
+				require.Equal(t, errcode.Success, parseResponse(t, recorder.Body, nil))
+			},
+		},
+		{
+			// 不能刪除自己（操作者 ID=1）：參數檢查就擋掉，不碰 DB
+			name: "CannotDeleteSelf",
+			url:  "/admin-users/1",
+			buildStubs: func(store *mockdb.MockStore, cacheMock *mockcache.MockCache) {
+				store.EXPECT().SoftDeleteAdminUser(gomock.Any(), gomock.Any()).Times(0)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusBadRequest, recorder.Code)
+				require.Equal(t, errcode.ErrCannotDeleteSelf, parseResponse(t, recorder.Body, nil))
+			},
+		},
+		{
+			name: "NotFound",
+			url:  "/admin-users/999",
+			buildStubs: func(store *mockdb.MockStore, cacheMock *mockcache.MockCache) {
+				store.EXPECT().
+					SoftDeleteAdminUser(gomock.Any(), gomock.Eq(int64(999))).
+					Times(1).
+					Return(int64(0), nil)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusNotFound, recorder.Code)
+				require.Equal(t, errcode.ErrUserNotFound, parseResponse(t, recorder.Body, nil))
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			store := mockdb.NewMockStore(ctrl)
+			cacheMock := mockcache.NewMockCache(ctrl)
+			tc.buildStubs(store, cacheMock)
+			// DELETE 會被 audit middleware 記操作日誌
+			store.EXPECT().
+				CreateOperationLog(gomock.Any(), gomock.Any()).
+				Times(1).
+				Return(db.OperationLog{}, nil)
+
+			server := newTestServer(t, store, cacheMock)
+			recorder := httptest.NewRecorder()
+
+			request, err := http.NewRequest(http.MethodDelete, tc.url, nil)
+			require.NoError(t, err)
+			setupAuth(t, request, cacheMock, toAuthUser(adminUser))
+
+			server.Router().ServeHTTP(recorder, request)
+			tc.checkResponse(t, recorder)
+		})
+	}
+}
+
+func TestRestoreAdminUserAPI(t *testing.T) {
+	adminUser, _ := testAdminUser(t)
+
+	testCases := []struct {
+		name          string
+		url           string
+		buildStubs    func(store *mockdb.MockStore)
+		checkResponse func(t *testing.T, recorder *httptest.ResponseRecorder)
+	}{
+		{
+			name: "OK",
+			url:  "/admin-users/2/restore",
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					RestoreAdminUser(gomock.Any(), gomock.Eq(int64(2))).
+					Times(1).
+					Return(int64(1), nil)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusOK, recorder.Code)
+				require.Equal(t, errcode.Success, parseResponse(t, recorder.Body, nil))
+			},
+		},
+		{
+			name: "NotFound",
+			url:  "/admin-users/999/restore",
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					RestoreAdminUser(gomock.Any(), gomock.Eq(int64(999))).
+					Times(1).
+					Return(int64(0), nil)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusNotFound, recorder.Code)
+				require.Equal(t, errcode.ErrUserNotFound, parseResponse(t, recorder.Body, nil))
+			},
+		},
+		{
+			// 刪除期間同名帳號被重新建立：還原撞 partial unique index → 409
+			name: "UsernameRetaken",
+			url:  "/admin-users/2/restore",
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					RestoreAdminUser(gomock.Any(), gomock.Eq(int64(2))).
+					Times(1).
+					Return(int64(0), &pq.Error{Code: "23505"}) // unique_violation
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusConflict, recorder.Code)
+				require.Equal(t, errcode.ErrUserExists, parseResponse(t, recorder.Body, nil))
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			store := mockdb.NewMockStore(ctrl)
+			cacheMock := mockcache.NewMockCache(ctrl)
+			tc.buildStubs(store)
+			// PUT 會被 audit middleware 記操作日誌
+			store.EXPECT().
+				CreateOperationLog(gomock.Any(), gomock.Any()).
+				Times(1).
+				Return(db.OperationLog{}, nil)
+
+			server := newTestServer(t, store, cacheMock)
+			recorder := httptest.NewRecorder()
+
+			request, err := http.NewRequest(http.MethodPut, tc.url, nil)
+			require.NoError(t, err)
+			setupAuth(t, request, cacheMock, toAuthUser(adminUser))
+
+			server.Router().ServeHTTP(recorder, request)
+			tc.checkResponse(t, recorder)
+		})
+	}
 }

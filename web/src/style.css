@@ -134,6 +134,12 @@ button.secondary {
   border: 1px solid var(--line);
 }
 
+button.danger {
+  color: var(--danger);
+  background: transparent;
+  border: 1px solid var(--danger);
+}
+
 [role='alert'] {
   color: var(--danger);
   background: var(--danger-soft);
@@ -416,6 +422,11 @@ tbody tr:last-child td {
   border: 1px solid var(--line);
   font-weight: 500;
   margin-right: var(--space-1);
+}
+
+.deleted-badge {
+  color: var(--danger);
+  background: var(--danger-soft);
 }
 
 .checkbox-row {

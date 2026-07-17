@@ -5,9 +5,11 @@ Golang Web 專案模板：**gin + viper + sqlc + PostgreSQL + Redis + asynq**。
 ## 功能特色
 
 - **統一回應格式** `{code, msg, data}`，業務狀態碼集中在 `errcode/` 管理
-- **Token 驗證層**：Redis session、bcrypt 密碼、登入失敗鎖定、即時登出、
-  sliding TTL（活躍自動續期）、改密碼強制重新登入；前台/後台 user 分離，
-  登入者一律是後台 user（`admin_users`）
+- **Token 驗證層**：Redis session + 反查索引（一人一 session，重複登入踢舊裝置）、
+  bcrypt 密碼、登入失敗鎖定、即時登出、sliding TTL（活躍自動續期）、
+  改密碼強制重新登入；前台/後台 user 分離，登入者一律是後台 user（`admin_users`）
+- **使用者軟刪除**：前後台 user 皆為 `deleted_at` 軟刪除 + 還原 API，
+  partial unique index 讓同名可重新註冊；刪除後台帳號即時踢下線、不能刪自己
 - **RBAC 權限控制**：角色/權限四表 + `permMiddleware("user:read")` 路由層檢查，
   權限快照放 session、request 零 DB 查詢；後台可建帳號、指派角色
 - **可觀測性**：Request ID 貫穿鏈路（zerolog）、操作日誌（audit log）、統一 panic 回應
@@ -90,6 +92,12 @@ curl -H "token: <token>" 'http://localhost:8080/admin-users?pageNum=1&pageSize=1
 curl -H "token: <token>" http://localhost:8080/roles                                # 角色與權限清單（admin_user:read）
 curl -X POST -H "token: <token>" http://localhost:8080/admin-users -d '{"username":"viewer1","password":"viewer123","role_ids":[2]}'  # 建後台帳號（admin_user:write）
 curl -X PUT -H "token: <token>" http://localhost:8080/admin-users/2/roles -d '{"role_ids":[1,2]}'  # 指派角色，整組取代（admin_user:write）
+
+# 軟刪除／還原（列表帶 includeDeleted=true 可看到已刪除者）
+curl -X DELETE -H "token: <token>" http://localhost:8080/users/9                    # 軟刪除前台 user（user:write）
+curl -X PUT    -H "token: <token>" http://localhost:8080/users/9/restore            # 還原（user:write；撞名回 409）
+curl -X DELETE -H "token: <token>" http://localhost:8080/admin-users/2              # 軟刪除後台 user，session 立即失效（admin_user:write；不能刪自己）
+curl -X PUT    -H "token: <token>" http://localhost:8080/admin-users/2/restore      # 還原（admin_user:write）
 ```
 
 ## Roadmap（尚未實作）
@@ -109,8 +117,11 @@ curl -X PUT -H "token: <token>" http://localhost:8080/admin-users/2/roles -d '{"
 - [x] **`/readyz` readiness 端點** — ping DB/Redis，給 LB / ASG(ELB health check) /
       k8s readiness probe 判斷「這台能不能收流量」；依賴掛了是摘流量等恢復，不是自殺重啟
 - [x] **Session 補完** — sliding TTL（活躍使用者自動續期，不會用到一半被登出）+
-      `PUT /me/password` 改密碼（刪除目前 session 強制重登；單一 session key 設計，
-      不做反查索引，取捨見 NOTES「驗證層」）
+      `PUT /me/password` 改密碼（刪除目前 session 強制重登）+
+      `admin_session:<uid>` 反查索引（一人一 session；刪帳號即時踢下線，見 NOTES「驗證層」）
+- [x] **使用者軟刪除（前後台）** — `deleted_at` + partial unique index（同名可重新註冊、
+      還原撞名回 409）、`includeDeleted` 列表參數、還原 API；後台帳號刪除即時踢 session、
+      不能刪自己；前台刪除掛新權限 `user:write`。web 端有刪除（兩段式確認）／還原／含已刪除切換
 - [x] **Render 部署 demo**（Postgres + Redis + Web Service + Static Site）
       — migration 隨容器啟動自動跑、CORS 收斂、production 模式；細節與免費方案的
       限制（Postgres 30 天到期、Pre-Deploy Command 鎖付費方案）見 NOTES「Render 部署」

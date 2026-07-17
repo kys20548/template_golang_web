@@ -108,8 +108,30 @@ func (server *Server) login(ctx *gin.Context) {
 		return
 	}
 
+	// 一人一 session：反查索引上已有舊 token 就先踢掉（重複登入視同換裝置），
+	// 索引才能維持單一 key。踢失敗只記 log，不影響本次登入
+	oldToken, err := server.cache.Get(ctx, adminSessionKey(user.ID))
+	if err == nil {
+		if err := server.cache.Del(ctx, sessionKey(oldToken)); err != nil {
+			getLogger(ctx).Warn().Err(err).Msg("cannot delete previous session on re-login")
+		}
+	} else if !errors.Is(err, cache.ErrNotFound) {
+		getLogger(ctx).Warn().Err(err).Msg("cannot check admin session index on login")
+	}
+
 	err = server.cache.Set(ctx, sessionKey(token), string(payload), server.config.TokenDuration)
 	if err != nil {
+		failInternal(ctx, err)
+		return
+	}
+
+	// 反查索引（user → token）跟 session 同壽命；寫失敗就整個登入失敗，
+	// 不能留下「有 session 但反查不到」的帳號（刪除帳號時會踢不掉）
+	err = server.cache.Set(ctx, adminSessionKey(user.ID), token, server.config.TokenDuration)
+	if err != nil {
+		if delErr := server.cache.Del(ctx, sessionKey(token)); delErr != nil {
+			getLogger(ctx).Warn().Err(delErr).Msg("cannot rollback session after index write failure")
+		}
 		failInternal(ctx, err)
 		return
 	}
@@ -117,7 +139,7 @@ func (server *Server) login(ctx *gin.Context) {
 	ok(ctx, loginResponse{Token: token, User: newAdminUserResponse(user)})
 }
 
-// logout 刪除 Redis 上的 session，token 立即失效。
+// logout 刪除 Redis 上的 session 與反查索引，token 立即失效。
 // 能走到這裡表示已通過 authMiddleware，header 上必有有效 token。
 //
 // @Summary  登出
@@ -128,7 +150,8 @@ func (server *Server) login(ctx *gin.Context) {
 // @Router   /logout [post]
 func (server *Server) logout(ctx *gin.Context) {
 	token := ctx.GetHeader(tokenHeaderKey)
-	if err := server.cache.Del(ctx, sessionKey(token)); err != nil {
+	authUser := getAuthUser(ctx)
+	if err := server.cache.Del(ctx, sessionKey(token), adminSessionKey(authUser.UserID)); err != nil {
 		failInternal(ctx, err)
 		return
 	}
@@ -140,11 +163,8 @@ type changePasswordRequest struct {
 	NewPassword string `json:"new_password" binding:"required,min=6"`
 }
 
-// changePassword 修改登入者（後台 user）自己的密碼，成功後刪除目前的 session，需重新登入。
-//
-// 取捨：session 只有 session:<token> 一個 key，沒有 user → tokens 的反查索引，
-// 所以「同一帳號的其他 session」（正常情況不會有）不會被踢，會留到 TTL 自然過期。
-// 之後若要做「改密碼/停用帳號踢掉全部 token」，再加反查索引。
+// changePassword 修改登入者（後台 user）自己的密碼，成功後刪除目前的 session
+// 與反查索引，需重新登入。
 //
 // @Summary  修改密碼（成功後目前 token 失效，需重新登入）
 // @Tags     auth
@@ -190,10 +210,10 @@ func (server *Server) changePassword(ctx *gin.Context) {
 		return
 	}
 
-	// 刪除目前的 session，強制重新登入；失敗只記 log——
+	// 刪除目前的 session 與反查索引，強制重新登入；失敗只記 log——
 	// 密碼已改成功，這個 session 本來就是本人的，留著到過期也無害
 	token := ctx.GetHeader(tokenHeaderKey)
-	if err := server.cache.Del(ctx, sessionKey(token)); err != nil {
+	if err := server.cache.Del(ctx, sessionKey(token), adminSessionKey(authUser.UserID)); err != nil {
 		getLogger(ctx).Warn().Err(err).Msg("cannot delete session after password change")
 	}
 
@@ -234,5 +254,21 @@ func (server *Server) getLoginFailCount(ctx *gin.Context, username string) (int6
 func (server *Server) recordLoginFail(ctx *gin.Context, username string) {
 	if _, err := server.cache.Incr(ctx, loginFailKey(username), loginFailTTL); err != nil {
 		getLogger(ctx).Warn().Err(err).Msg("cannot record login fail count")
+	}
+}
+
+// kickAdminSession 透過反查索引把指定後台 user 的 session 踢下線，
+// 供刪除帳號等「立即失效」場景使用。索引不存在（沒登入）不算錯誤；
+// 其餘失敗只記 log，由呼叫端決定主流程要不要繼續。
+func (server *Server) kickAdminSession(ctx *gin.Context, adminUserID int64) {
+	token, err := server.cache.Get(ctx, adminSessionKey(adminUserID))
+	if err != nil {
+		if !errors.Is(err, cache.ErrNotFound) {
+			getLogger(ctx).Warn().Err(err).Int64("admin_user_id", adminUserID).Msg("cannot look up admin session index")
+		}
+		return
+	}
+	if err := server.cache.Del(ctx, sessionKey(token), adminSessionKey(adminUserID)); err != nil {
+		getLogger(ctx).Warn().Err(err).Int64("admin_user_id", adminUserID).Msg("cannot kick admin session")
 	}
 }

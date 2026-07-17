@@ -87,9 +87,13 @@ func (server *Server) setupRouter() {
 	authRoutes.GET("/users/:id", permMiddleware("user:read"), server.getUser)
 	// 個別路由範例：超過 2s 印 slow request WARN log（不中斷請求）
 	authRoutes.GET("/users", permMiddleware("user:read"), slowLogMiddleware(2000*time.Millisecond), server.listUsers)
+	authRoutes.DELETE("/users/:id", permMiddleware("user:write"), server.deleteUser)
+	authRoutes.PUT("/users/:id/restore", permMiddleware("user:write"), server.restoreUser)
 	authRoutes.GET("/admin-users", permMiddleware("admin_user:read"), server.listAdminUsers)
 	authRoutes.POST("/admin-users", permMiddleware("admin_user:write"), server.createAdminUser)
 	authRoutes.PUT("/admin-users/:id/roles", permMiddleware("admin_user:write"), server.updateAdminUserRoles)
+	authRoutes.DELETE("/admin-users/:id", permMiddleware("admin_user:write"), server.deleteAdminUser)
+	authRoutes.PUT("/admin-users/:id/restore", permMiddleware("admin_user:write"), server.restoreAdminUser)
 	authRoutes.GET("/roles", permMiddleware("admin_user:read"), server.listRoles)
 	authRoutes.GET("/operation-logs", permMiddleware("operation_log:read"), server.listOperationLogs)
 

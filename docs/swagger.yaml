@@ -33,6 +33,8 @@ definitions:
     properties:
       created_at:
         type: string
+      deleted_at:
+        type: string
       id:
         type: integer
       username:
@@ -41,6 +43,8 @@ definitions:
   api.adminUserWithRolesResponse:
     properties:
       created_at:
+        type: string
+      deleted_at:
         type: string
       id:
         type: integer
@@ -171,6 +175,8 @@ definitions:
     properties:
       created_at:
         type: string
+      deleted_at:
+        type: string
       email:
         type: string
       id:
@@ -218,6 +224,7 @@ definitions:
     - 20002
     - 20003
     - 20004
+    - 20005
     type: integer
     x-enum-varnames:
     - Success
@@ -232,6 +239,7 @@ definitions:
     - ErrUserExists
     - ErrWrongCredentials
     - ErrTooManyLoginFails
+    - ErrCannotDeleteSelf
 host: localhost:8080
 info:
   contact: {}
@@ -252,6 +260,10 @@ paths:
         name: pageSize
         required: true
         type: integer
+      - description: 是否包含已刪除者
+        in: query
+        name: includeDeleted
+        type: boolean
       produces:
       - application/json
       responses:
@@ -301,6 +313,62 @@ paths:
       security:
       - TokenAuth: []
       summary: 建立後台使用者
+      tags:
+      - admin-user
+  /admin-users/{id}:
+    delete:
+      parameters:
+      - description: 後台使用者 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.Response'
+        "400":
+          description: 不能刪除自己
+          schema:
+            $ref: '#/definitions/api.Response'
+        "404":
+          description: 使用者不存在或已刪除
+          schema:
+            $ref: '#/definitions/api.Response'
+      security:
+      - TokenAuth: []
+      summary: 刪除後台使用者（軟刪除，session 立即失效）
+      tags:
+      - admin-user
+  /admin-users/{id}/restore:
+    put:
+      parameters:
+      - description: 後台使用者 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.Response'
+        "404":
+          description: 使用者不存在或未被刪除
+          schema:
+            $ref: '#/definitions/api.Response'
+        "409":
+          description: 帳號名已被重新建立
+          schema:
+            $ref: '#/definitions/api.Response'
+      security:
+      - TokenAuth: []
+      summary: 還原後台使用者
       tags:
       - admin-user
   /admin-users/{id}/roles:
@@ -526,6 +594,10 @@ paths:
         name: pageSize
         required: true
         type: integer
+      - description: 是否包含已刪除者
+        in: query
+        name: includeDeleted
+        type: boolean
       produces:
       - application/json
       responses:
@@ -576,6 +648,29 @@ paths:
       tags:
       - user
   /users/{id}:
+    delete:
+      parameters:
+      - description: 使用者 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.Response'
+        "404":
+          description: 使用者不存在或已刪除
+          schema:
+            $ref: '#/definitions/api.Response'
+      security:
+      - TokenAuth: []
+      summary: 刪除前台使用者（軟刪除）
+      tags:
+      - user
     get:
       parameters:
       - description: 使用者 ID
@@ -598,6 +693,34 @@ paths:
       security:
       - TokenAuth: []
       summary: 查詢使用者
+      tags:
+      - user
+  /users/{id}/restore:
+    put:
+      parameters:
+      - description: 使用者 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.Response'
+        "404":
+          description: 使用者不存在或未被刪除
+          schema:
+            $ref: '#/definitions/api.Response'
+        "409":
+          description: 帳號名或 email 已被重新註冊
+          schema:
+            $ref: '#/definitions/api.Response'
+      security:
+      - TokenAuth: []
+      summary: 還原前台使用者
       tags:
       - user
   /wallets:

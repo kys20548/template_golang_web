@@ -11,10 +11,11 @@ import (
 
 const countAdminUsers = `-- name: CountAdminUsers :one
 SELECT count(*) FROM admin_users
+WHERE ($1::bool OR deleted_at IS NULL)
 `
 
-func (q *Queries) CountAdminUsers(ctx context.Context) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countAdminUsers)
+func (q *Queries) CountAdminUsers(ctx context.Context, includeDeleted bool) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countAdminUsers, includeDeleted)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -26,7 +27,7 @@ INSERT INTO admin_users (
     hashed_password
 ) VALUES (
     $1, $2
-) RETURNING id, username, hashed_password, created_at
+) RETURNING id, username, hashed_password, created_at, deleted_at
 `
 
 type CreateAdminUserParams struct {
@@ -42,13 +43,15 @@ func (q *Queries) CreateAdminUser(ctx context.Context, arg CreateAdminUserParams
 		&i.Username,
 		&i.HashedPassword,
 		&i.CreatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const getAdminUser = `-- name: GetAdminUser :one
-SELECT id, username, hashed_password, created_at FROM admin_users
-WHERE id = $1 LIMIT 1
+SELECT id, username, hashed_password, created_at, deleted_at FROM admin_users
+WHERE id = $1 AND deleted_at IS NULL
+LIMIT 1
 `
 
 func (q *Queries) GetAdminUser(ctx context.Context, id int64) (AdminUser, error) {
@@ -59,13 +62,15 @@ func (q *Queries) GetAdminUser(ctx context.Context, id int64) (AdminUser, error)
 		&i.Username,
 		&i.HashedPassword,
 		&i.CreatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const getAdminUserByUsername = `-- name: GetAdminUserByUsername :one
-SELECT id, username, hashed_password, created_at FROM admin_users
-WHERE username = $1 LIMIT 1
+SELECT id, username, hashed_password, created_at, deleted_at FROM admin_users
+WHERE username = $1 AND deleted_at IS NULL
+LIMIT 1
 `
 
 func (q *Queries) GetAdminUserByUsername(ctx context.Context, username string) (AdminUser, error) {
@@ -76,24 +81,27 @@ func (q *Queries) GetAdminUserByUsername(ctx context.Context, username string) (
 		&i.Username,
 		&i.HashedPassword,
 		&i.CreatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const listAdminUsers = `-- name: ListAdminUsers :many
-SELECT id, username, hashed_password, created_at FROM admin_users
+SELECT id, username, hashed_password, created_at, deleted_at FROM admin_users
+WHERE ($1::bool OR deleted_at IS NULL)
 ORDER BY id
-LIMIT $1
+LIMIT $3
 OFFSET $2
 `
 
 type ListAdminUsersParams struct {
-	Limit  int32 `json:"limit"`
-	Offset int32 `json:"offset"`
+	IncludeDeleted bool  `json:"include_deleted"`
+	PageOffset     int32 `json:"page_offset"`
+	PageLimit      int32 `json:"page_limit"`
 }
 
 func (q *Queries) ListAdminUsers(ctx context.Context, arg ListAdminUsersParams) ([]AdminUser, error) {
-	rows, err := q.db.QueryContext(ctx, listAdminUsers, arg.Limit, arg.Offset)
+	rows, err := q.db.QueryContext(ctx, listAdminUsers, arg.IncludeDeleted, arg.PageOffset, arg.PageLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -106,6 +114,7 @@ func (q *Queries) ListAdminUsers(ctx context.Context, arg ListAdminUsersParams) 
 			&i.Username,
 			&i.HashedPassword,
 			&i.CreatedAt,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -118,6 +127,34 @@ func (q *Queries) ListAdminUsers(ctx context.Context, arg ListAdminUsersParams) 
 		return nil, err
 	}
 	return items, nil
+}
+
+const restoreAdminUser = `-- name: RestoreAdminUser :execrows
+UPDATE admin_users
+SET deleted_at = NULL
+WHERE id = $1 AND deleted_at IS NOT NULL
+`
+
+func (q *Queries) RestoreAdminUser(ctx context.Context, id int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, restoreAdminUser, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const softDeleteAdminUser = `-- name: SoftDeleteAdminUser :execrows
+UPDATE admin_users
+SET deleted_at = now()
+WHERE id = $1 AND deleted_at IS NULL
+`
+
+func (q *Queries) SoftDeleteAdminUser(ctx context.Context, id int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, softDeleteAdminUser, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const updateAdminUserPassword = `-- name: UpdateAdminUserPassword :exec

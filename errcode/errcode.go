@@ -21,6 +21,7 @@ const (
 	ErrUserExists        Code = 20002
 	ErrWrongCredentials  Code = 20003
 	ErrTooManyLoginFails Code = 20004
+	ErrCannotDeleteSelf  Code = 20005
 
 	// 錢包相關 3xxxx（目前只有列表查詢，尚無專屬錯誤碼；新增時從 30001 開始編）
 )
@@ -38,6 +39,7 @@ var messages = map[Code]string{
 	ErrUserExists:        "使用者已存在",
 	ErrWrongCredentials:  "帳號或密碼錯誤",
 	ErrTooManyLoginFails: "登入失敗次數過多，請稍後再試",
+	ErrCannotDeleteSelf:  "不能刪除自己的帳號",
 }
 
 // Msg 回傳錯誤碼對應的訊息，未定義的碼回傳系統內部錯誤訊息。

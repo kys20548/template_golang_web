@@ -375,13 +375,14 @@ func TestListUsersAPI(t *testing.T) {
 			name: "OK",
 			url:  "/users?pageNum=2&pageSize=5",
 			buildStubs: func(store *mockdb.MockStore) {
-				// 驗證分頁換算：pageNum=2, pageSize=5 → LIMIT 5 OFFSET 5
+				// 驗證分頁換算：pageNum=2, pageSize=5 → LIMIT 5 OFFSET 5；
+				// 沒帶 includeDeleted 就只查未刪除者
 				store.EXPECT().
-					ListUsers(gomock.Any(), gomock.Eq(db.ListUsersParams{Limit: 5, Offset: 5})).
+					ListUsers(gomock.Any(), gomock.Eq(db.ListUsersParams{PageLimit: 5, PageOffset: 5})).
 					Times(1).
 					Return(users, nil)
 				store.EXPECT().
-					CountUsers(gomock.Any()).
+					CountUsers(gomock.Any(), gomock.Eq(false)).
 					Times(1).
 					Return(int64(7), nil)
 			},
@@ -400,7 +401,7 @@ func TestListUsersAPI(t *testing.T) {
 			url:  "/users?pageNum=1&pageSize=100", // binding max=50
 			buildStubs: func(store *mockdb.MockStore) {
 				store.EXPECT().ListUsers(gomock.Any(), gomock.Any()).Times(0)
-				store.EXPECT().CountUsers(gomock.Any()).Times(0)
+				store.EXPECT().CountUsers(gomock.Any(), gomock.Any()).Times(0)
 			},
 			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
 				require.Equal(t, http.StatusBadRequest, recorder.Code)
@@ -416,7 +417,7 @@ func TestListUsersAPI(t *testing.T) {
 					Times(1).
 					Return(nil, sql.ErrConnDone)
 				// 查列表就失敗了，不會再查 total
-				store.EXPECT().CountUsers(gomock.Any()).Times(0)
+				store.EXPECT().CountUsers(gomock.Any(), gomock.Any()).Times(0)
 			},
 			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
 				require.Equal(t, http.StatusInternalServerError, recorder.Code)
@@ -436,6 +437,162 @@ func TestListUsersAPI(t *testing.T) {
 			recorder := httptest.NewRecorder()
 
 			request, err := http.NewRequest(http.MethodGet, tc.url, nil)
+			require.NoError(t, err)
+			setupAuth(t, request, cacheMock, toAuthUser(adminUser))
+
+			server.Router().ServeHTTP(recorder, request)
+			tc.checkResponse(t, recorder)
+		})
+	}
+}
+
+func TestDeleteUserAPI(t *testing.T) {
+	adminUser, _ := testAdminUser(t)
+
+	testCases := []struct {
+		name          string
+		url           string
+		buildStubs    func(store *mockdb.MockStore)
+		checkResponse func(t *testing.T, recorder *httptest.ResponseRecorder)
+	}{
+		{
+			name: "OK",
+			url:  "/users/1",
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					SoftDeleteUser(gomock.Any(), gomock.Eq(int64(1))).
+					Times(1).
+					Return(int64(1), nil)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusOK, recorder.Code)
+				require.Equal(t, errcode.Success, parseResponse(t, recorder.Body, nil))
+			},
+		},
+		{
+			// 不存在或已刪除：UPDATE 影響 0 列 → 404
+			name: "NotFound",
+			url:  "/users/999",
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					SoftDeleteUser(gomock.Any(), gomock.Eq(int64(999))).
+					Times(1).
+					Return(int64(0), nil)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusNotFound, recorder.Code)
+				require.Equal(t, errcode.ErrUserNotFound, parseResponse(t, recorder.Body, nil))
+			},
+		},
+		{
+			name: "InvalidID",
+			url:  "/users/0",
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().SoftDeleteUser(gomock.Any(), gomock.Any()).Times(0)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusBadRequest, recorder.Code)
+				require.Equal(t, errcode.ErrInvalidParams, parseResponse(t, recorder.Body, nil))
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			store := mockdb.NewMockStore(ctrl)
+			cacheMock := mockcache.NewMockCache(ctrl)
+			tc.buildStubs(store)
+			// DELETE 會被 audit middleware 記操作日誌
+			store.EXPECT().
+				CreateOperationLog(gomock.Any(), gomock.Any()).
+				Times(1).
+				Return(db.OperationLog{}, nil)
+
+			server := newTestServer(t, store, cacheMock)
+			recorder := httptest.NewRecorder()
+
+			request, err := http.NewRequest(http.MethodDelete, tc.url, nil)
+			require.NoError(t, err)
+			setupAuth(t, request, cacheMock, toAuthUser(adminUser))
+
+			server.Router().ServeHTTP(recorder, request)
+			tc.checkResponse(t, recorder)
+		})
+	}
+}
+
+func TestRestoreUserAPI(t *testing.T) {
+	adminUser, _ := testAdminUser(t)
+
+	testCases := []struct {
+		name          string
+		url           string
+		buildStubs    func(store *mockdb.MockStore)
+		checkResponse func(t *testing.T, recorder *httptest.ResponseRecorder)
+	}{
+		{
+			name: "OK",
+			url:  "/users/1/restore",
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					RestoreUser(gomock.Any(), gomock.Eq(int64(1))).
+					Times(1).
+					Return(int64(1), nil)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusOK, recorder.Code)
+				require.Equal(t, errcode.Success, parseResponse(t, recorder.Body, nil))
+			},
+		},
+		{
+			// 未被刪除或不存在：UPDATE 影響 0 列 → 404
+			name: "NotFound",
+			url:  "/users/999/restore",
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					RestoreUser(gomock.Any(), gomock.Eq(int64(999))).
+					Times(1).
+					Return(int64(0), nil)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusNotFound, recorder.Code)
+				require.Equal(t, errcode.ErrUserNotFound, parseResponse(t, recorder.Body, nil))
+			},
+		},
+		{
+			// 刪除期間同名帳號被重新註冊：還原撞 partial unique index → 409
+			name: "UsernameRetaken",
+			url:  "/users/1/restore",
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					RestoreUser(gomock.Any(), gomock.Eq(int64(1))).
+					Times(1).
+					Return(int64(0), &pq.Error{Code: "23505"}) // unique_violation
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusConflict, recorder.Code)
+				require.Equal(t, errcode.ErrUserExists, parseResponse(t, recorder.Body, nil))
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			store := mockdb.NewMockStore(ctrl)
+			cacheMock := mockcache.NewMockCache(ctrl)
+			tc.buildStubs(store)
+			// PUT 會被 audit middleware 記操作日誌
+			store.EXPECT().
+				CreateOperationLog(gomock.Any(), gomock.Any()).
+				Times(1).
+				Return(db.OperationLog{}, nil)
+
+			server := newTestServer(t, store, cacheMock)
+			recorder := httptest.NewRecorder()
+
+			request, err := http.NewRequest(http.MethodPut, tc.url, nil)
 			require.NoError(t, err)
 			setupAuth(t, request, cacheMock, toAuthUser(adminUser))
 

@@ -11,10 +11,11 @@ import (
 
 const countUsers = `-- name: CountUsers :one
 SELECT count(*) FROM users
+WHERE ($1::bool OR deleted_at IS NULL)
 `
 
-func (q *Queries) CountUsers(ctx context.Context) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countUsers)
+func (q *Queries) CountUsers(ctx context.Context, includeDeleted bool) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countUsers, includeDeleted)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -27,7 +28,7 @@ INSERT INTO users (
     hashed_password
 ) VALUES (
     $1, $2, $3
-) RETURNING id, username, email, created_at, hashed_password
+) RETURNING id, username, email, created_at, hashed_password, deleted_at
 `
 
 type CreateUserParams struct {
@@ -45,25 +46,17 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Email,
 		&i.CreatedAt,
 		&i.HashedPassword,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
-const deleteUser = `-- name: DeleteUser :exec
-DELETE FROM users
-WHERE id = $1
-`
-
-func (q *Queries) DeleteUser(ctx context.Context, id int64) error {
-	_, err := q.db.ExecContext(ctx, deleteUser, id)
-	return err
-}
-
 const getUser = `-- name: GetUser :one
-SELECT id, username, email, created_at, hashed_password FROM users
+SELECT id, username, email, created_at, hashed_password, deleted_at FROM users
 WHERE id = $1 LIMIT 1
 `
 
+// GetUser 不過濾 deleted_at：後台以 ID 查詳情時，已刪除者也要能查到
 func (q *Queries) GetUser(ctx context.Context, id int64) (User, error) {
 	row := q.db.QueryRowContext(ctx, getUser, id)
 	var i User
@@ -73,13 +66,15 @@ func (q *Queries) GetUser(ctx context.Context, id int64) (User, error) {
 		&i.Email,
 		&i.CreatedAt,
 		&i.HashedPassword,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, username, email, created_at, hashed_password FROM users
-WHERE username = $1 LIMIT 1
+SELECT id, username, email, created_at, hashed_password, deleted_at FROM users
+WHERE username = $1 AND deleted_at IS NULL
+LIMIT 1
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
@@ -91,24 +86,27 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.Email,
 		&i.CreatedAt,
 		&i.HashedPassword,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, username, email, created_at, hashed_password FROM users
+SELECT id, username, email, created_at, hashed_password, deleted_at FROM users
+WHERE ($1::bool OR deleted_at IS NULL)
 ORDER BY id
-LIMIT $1
+LIMIT $3
 OFFSET $2
 `
 
 type ListUsersParams struct {
-	Limit  int32 `json:"limit"`
-	Offset int32 `json:"offset"`
+	IncludeDeleted bool  `json:"include_deleted"`
+	PageOffset     int32 `json:"page_offset"`
+	PageLimit      int32 `json:"page_limit"`
 }
 
 func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error) {
-	rows, err := q.db.QueryContext(ctx, listUsers, arg.Limit, arg.Offset)
+	rows, err := q.db.QueryContext(ctx, listUsers, arg.IncludeDeleted, arg.PageOffset, arg.PageLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -122,6 +120,7 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 			&i.Email,
 			&i.CreatedAt,
 			&i.HashedPassword,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -134,6 +133,34 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 		return nil, err
 	}
 	return items, nil
+}
+
+const restoreUser = `-- name: RestoreUser :execrows
+UPDATE users
+SET deleted_at = NULL
+WHERE id = $1 AND deleted_at IS NOT NULL
+`
+
+func (q *Queries) RestoreUser(ctx context.Context, id int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, restoreUser, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const softDeleteUser = `-- name: SoftDeleteUser :execrows
+UPDATE users
+SET deleted_at = now()
+WHERE id = $1 AND deleted_at IS NULL
+`
+
+func (q *Queries) SoftDeleteUser(ctx context.Context, id int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, softDeleteUser, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const updateUserPassword = `-- name: UpdateUserPassword :exec

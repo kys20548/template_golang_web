@@ -33,18 +33,25 @@ id + username）放進 gin context，handler 用 `getAuthUser(ctx)` 取得登入
 連續失敗 5 次鎖定 15 分鐘（Redis 計數器）；`POST /logout` 刪除 session 即時登出。
 user 對外回應一律走 `userResponse` / `adminUserResponse`，不會帶出 hashed_password。
 
-**Session 生命週期**（單一 Redis key：`session:<token>` → AuthUser JSON，
-TTL = `TOKEN_DURATION`）：
+**Session 生命週期**（兩個 Redis key，TTL 皆 = `TOKEN_DURATION`）：
 
-- **sliding TTL**：authMiddleware 驗證通過就把 TTL 重設回 `TOKEN_DURATION`——
-  活躍使用者不會用到一半被登出，閒置滿 `TOKEN_DURATION` 才過期。
-  續期失敗不影響本次請求（session 還沒過期），只記 WARN。
-- **改密碼**：`PUT /me/password` 驗舊密碼 → 改密碼 → 刪除目前的 session，
-  強制重新登入。
-- **取捨（刻意保持簡單）**：沒有 user → tokens 的反查索引，所以同一帳號的
-  其他 session（正常情況不會有——不會登入了一次又登入第二次）不會被踢，
-  留到 TTL 自然過期。之後若真需要「改密碼/停用帳號踢掉全部裝置」，
-  再加 `user_sessions:<id>` set 反查索引。
+- `session:<token>` → AuthUser JSON：驗證層每個 request 查的 key。
+- `admin_session:<userID>` → token：**反查索引**，登入時跟 session 一起寫。
+  沒有它就找不到「某個 user 的 session」——Redis keyspace 是扁平 hash table，
+  把 userID 塞進 session key 也無法反查（SCAN MATCH 是全 keyspace 掃描，
+  不是索引）。刪除帳號要立即踢人就靠它。
+- **一人一 session**：登入時若索引上已有舊 token，先刪舊 session 再寫新的
+  （重複登入視同換裝置）——索引因此永遠只是單一 key，不用維護 set 和
+  清理殭屍成員。副作用可接受：同帳號兩個裝置同時用，後登入的會把先前的踢掉。
+- **sliding TTL**：authMiddleware 驗證通過就把兩個 key 的 TTL 都重設回
+  `TOKEN_DURATION`——活躍使用者不會用到一半被登出，閒置滿 `TOKEN_DURATION`
+  才過期。續期失敗不影響本次請求（session 還沒過期），只記 WARN。
+- **登出／改密碼**：一次刪掉兩個 key，強制重新登入。
+- **刪除後台帳號**（`DELETE /admin-users/:id`）：軟刪除成功後用反查索引
+  找到對方 token，立即刪 session 踢下線（`kickAdminSession`）；對方沒登入
+  （索引不存在）不算錯誤。
+- 部署反查索引「之前」建立的舊 session 不在索引上，踢不到，
+  會留到 TTL 自然過期——一次性的上線邊界，不處理。
 
 ```bash
 TOKEN=$(curl -s -X POST localhost:8080/login -d '{"username":"admin","password":"admin123"}' | jq -r .data.token)
@@ -70,14 +77,36 @@ curl -H "token: $TOKEN" localhost:8080/me
   宣告式、跟路由定義放在一起一眼可讀；沒權限回 403 + 10007
 - `/me`、`/logout`、`/me/password` 只要登入就能用，不掛權限
 
-**取捨（同 session 設計）**：權限是登入時的快照，改角色要對方重新登入才生效。
-後台帳號少、權限異動罕見，可接受；要即時生效時加 user → tokens 反查索引，
-在指派角色後把該 user 的 session 全刪掉。
+**取捨**：權限是登入時的快照，改角色要對方重新登入才生效。
+後台帳號少、權限異動罕見，可接受；反查索引已經有了（見「驗證層」），
+要即時生效只需在指派角色後呼叫 `kickAdminSession` 強制重登——
+目前刻意不做，避免「改個角色就把人踢下線」的突兀體驗。
 
 **管理範圍刻意收斂**：後台可建帳號（`POST /admin-users`，transaction 內同時指派角色）、
 指派角色（`PUT /admin-users/:id/roles`，整組取代）；角色與權限本身唯讀
 （`GET /roles`），異動用 migration/SQL 管——角色 CRUD + 勾權限的 UI
 等有實際需求再加。
+
+## 使用者軟刪除（前後台）
+
+`users`、`admin_users` 加 `deleted_at timestamptz`（migration 000007）：
+刪除 = 打時間戳（`UPDATE ... WHERE deleted_at IS NULL`，`:execrows` 影響
+0 列即 404），關聯資料（錢包、角色綁定）原封不動，`PUT /:id/restore` 還原。
+
+- **partial unique index**：username/email 的唯一約束改成
+  `CREATE UNIQUE INDEX ... WHERE deleted_at IS NULL`——軟刪除後同名可重新註冊，
+  否則刪掉的帳號永遠占用名字。代價是**還原可能撞名**（刪除期間有人註冊了
+  同名帳號），restore 的 UPDATE 會觸發 unique_violation → 409 + 20002。
+- **查詢過濾**：列表預設 `deleted_at IS NULL`，query 參數 `includeDeleted=true`
+  連已刪除一起列（回應多 `deleted_at` 欄位，UI 據此顯示徽章與還原鈕）；
+  `GetUser`（依 ID 查詳情）刻意不過濾——後台要能查已刪除者；
+  錢包列表 join 時過濾掉已刪除前台 user 的錢包；
+  `GetAdminUserByUsername` 過濾——已刪除的後台帳號不能登入。
+- **刪除後台帳號的即時性**：軟刪除成功後經反查索引立即踢掉對方 session
+  （見「驗證層」）；**不能刪自己**（400 + 20005）——這也保證系統裡永遠
+  至少留著一個持有 admin_user:write、能還原帳號的活人。
+- 前台 user 刪除／還原掛新權限 `user:write`（seed 只給 super_admin）；
+  後台 user 沿用 `admin_user:write`。
 
 ## Request ID 貫穿鏈路
 

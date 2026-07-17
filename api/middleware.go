@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"time"
 
@@ -26,6 +27,10 @@ const (
 	authUserKey = "auth_user"
 	// sessionKeyPrefix 為 token 存在 Redis 的 key 前綴。
 	sessionKeyPrefix = "session:"
+	// adminSessionKeyPrefix 為 user → token 反查索引的 key 前綴：
+	// 登入時與 session 一起寫入（一人一 session），刪除帳號等場景
+	// 才能反查到 token 立即踢下線。
+	adminSessionKeyPrefix = "admin_session:"
 	// requestIDHeaderKey 為 request id 的 header 名稱，回應時帶回給 client。
 	requestIDHeaderKey = "X-Request-Id"
 	// requestIDKey 為 request id 存放在 gin context 的 key，也是 log 欄位名。
@@ -34,7 +39,7 @@ const (
 
 // AuthUser 為登入者（後台 user）資訊，驗證通過後放入 context 供後續邏輯使用。
 // Permissions 是登入當下的權限快照（permission codes）——之後改角色要重新登入
-// 才生效，取捨同 session 不做反查索引（見 NOTES.md「驗證層」）。
+// 才生效（見 NOTES.md「驗證層」）。
 type AuthUser struct {
 	UserID      int64    `json:"user_id"`
 	Username    string   `json:"username"`
@@ -53,6 +58,10 @@ func (u AuthUser) HasPermission(code string) bool {
 
 func sessionKey(token string) string {
 	return sessionKeyPrefix + token
+}
+
+func adminSessionKey(adminUserID int64) string {
+	return adminSessionKeyPrefix + strconv.FormatInt(adminUserID, 10)
 }
 
 // authMiddleware 驗證層：從 header 取出 token，確認存在於 Redis 後
@@ -83,9 +92,13 @@ func authMiddleware(cacheStore cache.Cache, tokenDuration time.Duration) gin.Han
 			return
 		}
 
-		// sliding TTL：續期失敗不影響本次請求（session 還沒過期），只記 log
+		// sliding TTL：續期失敗不影響本次請求（session 還沒過期），只記 log。
+		// 反查索引跟 session 同進退，一起續期
 		if err := cacheStore.Expire(ctx, sessionKey(token), tokenDuration); err != nil {
 			getLogger(ctx).Warn().Err(err).Msg("cannot refresh session ttl")
+		}
+		if err := cacheStore.Expire(ctx, adminSessionKey(user.UserID), tokenDuration); err != nil {
+			getLogger(ctx).Warn().Err(err).Msg("cannot refresh admin session index ttl")
 		}
 
 		ctx.Set(authUserKey, user)

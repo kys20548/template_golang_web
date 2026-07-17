@@ -43,18 +43,18 @@ func (m *MockStore) EXPECT() *MockStoreMockRecorder {
 }
 
 // CountAdminUsers mocks base method.
-func (m *MockStore) CountAdminUsers(ctx context.Context) (int64, error) {
+func (m *MockStore) CountAdminUsers(ctx context.Context, includeDeleted bool) (int64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CountAdminUsers", ctx)
+	ret := m.ctrl.Call(m, "CountAdminUsers", ctx, includeDeleted)
 	ret0, _ := ret[0].(int64)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CountAdminUsers indicates an expected call of CountAdminUsers.
-func (mr *MockStoreMockRecorder) CountAdminUsers(ctx any) *gomock.Call {
+func (mr *MockStoreMockRecorder) CountAdminUsers(ctx, includeDeleted any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountAdminUsers", reflect.TypeOf((*MockStore)(nil).CountAdminUsers), ctx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountAdminUsers", reflect.TypeOf((*MockStore)(nil).CountAdminUsers), ctx, includeDeleted)
 }
 
 // CountOperationLogs mocks base method.
@@ -73,18 +73,18 @@ func (mr *MockStoreMockRecorder) CountOperationLogs(ctx any) *gomock.Call {
 }
 
 // CountUsers mocks base method.
-func (m *MockStore) CountUsers(ctx context.Context) (int64, error) {
+func (m *MockStore) CountUsers(ctx context.Context, includeDeleted bool) (int64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CountUsers", ctx)
+	ret := m.ctrl.Call(m, "CountUsers", ctx, includeDeleted)
 	ret0, _ := ret[0].(int64)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CountUsers indicates an expected call of CountUsers.
-func (mr *MockStoreMockRecorder) CountUsers(ctx any) *gomock.Call {
+func (mr *MockStoreMockRecorder) CountUsers(ctx, includeDeleted any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountUsers", reflect.TypeOf((*MockStore)(nil).CountUsers), ctx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountUsers", reflect.TypeOf((*MockStore)(nil).CountUsers), ctx, includeDeleted)
 }
 
 // CountWallets mocks base method.
@@ -233,20 +233,6 @@ func (m *MockStore) DeleteOperationLogsBefore(ctx context.Context, createdAt tim
 func (mr *MockStoreMockRecorder) DeleteOperationLogsBefore(ctx, createdAt any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteOperationLogsBefore", reflect.TypeOf((*MockStore)(nil).DeleteOperationLogsBefore), ctx, createdAt)
-}
-
-// DeleteUser mocks base method.
-func (m *MockStore) DeleteUser(ctx context.Context, id int64) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteUser", ctx, id)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// DeleteUser indicates an expected call of DeleteUser.
-func (mr *MockStoreMockRecorder) DeleteUser(ctx, id any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUser", reflect.TypeOf((*MockStore)(nil).DeleteUser), ctx, id)
 }
 
 // GetAdminUser mocks base method.
@@ -441,6 +427,66 @@ func (m *MockStore) Ping(ctx context.Context) error {
 func (mr *MockStoreMockRecorder) Ping(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ping", reflect.TypeOf((*MockStore)(nil).Ping), ctx)
+}
+
+// RestoreAdminUser mocks base method.
+func (m *MockStore) RestoreAdminUser(ctx context.Context, id int64) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RestoreAdminUser", ctx, id)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RestoreAdminUser indicates an expected call of RestoreAdminUser.
+func (mr *MockStoreMockRecorder) RestoreAdminUser(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RestoreAdminUser", reflect.TypeOf((*MockStore)(nil).RestoreAdminUser), ctx, id)
+}
+
+// RestoreUser mocks base method.
+func (m *MockStore) RestoreUser(ctx context.Context, id int64) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RestoreUser", ctx, id)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RestoreUser indicates an expected call of RestoreUser.
+func (mr *MockStoreMockRecorder) RestoreUser(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RestoreUser", reflect.TypeOf((*MockStore)(nil).RestoreUser), ctx, id)
+}
+
+// SoftDeleteAdminUser mocks base method.
+func (m *MockStore) SoftDeleteAdminUser(ctx context.Context, id int64) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SoftDeleteAdminUser", ctx, id)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SoftDeleteAdminUser indicates an expected call of SoftDeleteAdminUser.
+func (mr *MockStoreMockRecorder) SoftDeleteAdminUser(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SoftDeleteAdminUser", reflect.TypeOf((*MockStore)(nil).SoftDeleteAdminUser), ctx, id)
+}
+
+// SoftDeleteUser mocks base method.
+func (m *MockStore) SoftDeleteUser(ctx context.Context, id int64) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SoftDeleteUser", ctx, id)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SoftDeleteUser indicates an expected call of SoftDeleteUser.
+func (mr *MockStoreMockRecorder) SoftDeleteUser(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SoftDeleteUser", reflect.TypeOf((*MockStore)(nil).SoftDeleteUser), ctx, id)
 }
 
 // UpdateAdminUserPassword mocks base method.

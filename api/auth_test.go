@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -21,9 +22,17 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
+// sessionKeyMatcher 比對「session:<隨機 token>」形式的 key——
+// token 是隨機 UUID 無法用 Eq，比對前綴以跟反查索引 key 區分開。
+func sessionKeyMatcher() gomock.Matcher {
+	return gomock.Cond(func(x string) bool {
+		return strings.HasPrefix(x, sessionKeyPrefix)
+	})
+}
+
 // TestLoginAPI 是 mock cache 用得最充分的測試：
-// 登入流程對 cache 的每一步互動（查失敗計數、記失敗、清計數、寫 session）
-// 都是業務邏輯的一部分，mock 的 Times(n) 能逐一驗證。
+// 登入流程對 cache 的每一步互動（查失敗計數、記失敗、清計數、寫 session
+// 與反查索引）都是業務邏輯的一部分，mock 的 Times(n) 能逐一驗證。
 func TestLoginAPI(t *testing.T) {
 	user, password := testAdminUser(t)
 
@@ -54,14 +63,23 @@ func TestLoginAPI(t *testing.T) {
 					ListPermissionCodesByAdminUserID(gomock.Any(), gomock.Eq(user.ID)).
 					Times(1).
 					Return([]string{"*"}, nil)
-				// 登入成功：清除失敗計數 + 寫入 session
-				// （token 是隨機 UUID，key 無法預測，用 Any）
+				// 登入成功：清除失敗計數，檢查反查索引（沒有舊 session），
+				// 寫入 session 與反查索引
+				// （token 是隨機 UUID，session key 無法預測，用前綴比對）
 				cacheMock.EXPECT().
 					Del(gomock.Any(), gomock.Eq(loginFailKey(user.Username))).
 					Times(1).
 					Return(nil)
 				cacheMock.EXPECT().
-					Set(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					Get(gomock.Any(), gomock.Eq(adminSessionKey(user.ID))).
+					Times(1).
+					Return("", cache.ErrNotFound)
+				cacheMock.EXPECT().
+					Set(gomock.Any(), sessionKeyMatcher(), gomock.Any(), gomock.Any()).
+					Times(1).
+					Return(nil)
+				cacheMock.EXPECT().
+					Set(gomock.Any(), gomock.Eq(adminSessionKey(user.ID)), gomock.Any(), gomock.Any()).
 					Times(1).
 					Return(nil)
 				store.EXPECT().
@@ -76,6 +94,59 @@ func TestLoginAPI(t *testing.T) {
 				require.Equal(t, errcode.Success, parseResponse(t, recorder.Body, &got))
 				require.NotEmpty(t, got.Token)
 				require.Equal(t, newAdminUserResponse(user), got.User)
+			},
+		},
+		{
+			// 一人一 session：重複登入時反查索引上有舊 token，舊 session 要被踢掉
+			name: "ReLoginKicksOldSession",
+			body: gin.H{
+				"username": user.Username,
+				"password": password,
+			},
+			buildStubs: func(store *mockdb.MockStore, cacheMock *mockcache.MockCache) {
+				cacheMock.EXPECT().
+					Get(gomock.Any(), gomock.Eq(loginFailKey(user.Username))).
+					Times(1).
+					Return("", cache.ErrNotFound)
+				store.EXPECT().
+					GetAdminUserByUsername(gomock.Any(), gomock.Eq(user.Username)).
+					Times(1).
+					Return(user, nil)
+				store.EXPECT().
+					ListPermissionCodesByAdminUserID(gomock.Any(), gomock.Eq(user.ID)).
+					Times(1).
+					Return([]string{"*"}, nil)
+				cacheMock.EXPECT().
+					Del(gomock.Any(), gomock.Eq(loginFailKey(user.Username))).
+					Times(1).
+					Return(nil)
+				cacheMock.EXPECT().
+					Get(gomock.Any(), gomock.Eq(adminSessionKey(user.ID))).
+					Times(1).
+					Return("old-token", nil)
+				cacheMock.EXPECT().
+					Del(gomock.Any(), gomock.Eq(sessionKey("old-token"))).
+					Times(1).
+					Return(nil)
+				cacheMock.EXPECT().
+					Set(gomock.Any(), sessionKeyMatcher(), gomock.Any(), gomock.Any()).
+					Times(1).
+					Return(nil)
+				cacheMock.EXPECT().
+					Set(gomock.Any(), gomock.Eq(adminSessionKey(user.ID)), gomock.Any(), gomock.Any()).
+					Times(1).
+					Return(nil)
+				store.EXPECT().
+					CreateOperationLog(gomock.Any(), gomock.Any()).
+					Times(1).
+					Return(db.OperationLog{}, nil)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusOK, recorder.Code)
+
+				var got loginResponse
+				require.Equal(t, errcode.Success, parseResponse(t, recorder.Body, &got))
+				require.NotEmpty(t, got.Token)
 			},
 		},
 		{
@@ -195,9 +266,9 @@ func TestLogoutAPI(t *testing.T) {
 	store := mockdb.NewMockStore(ctrl)
 	cacheMock := mockcache.NewMockCache(ctrl)
 
-	// 登出 = 刪掉 Redis 上的 session（setupAuth 用的 token 是 fake-token）
+	// 登出 = 刪掉 Redis 上的 session 與反查索引（setupAuth 用的 token 是 fake-token）
 	cacheMock.EXPECT().
-		Del(gomock.Any(), gomock.Eq(sessionKey("fake-token"))).
+		Del(gomock.Any(), gomock.Eq(sessionKey("fake-token")), gomock.Eq(adminSessionKey(user.ID))).
 		Times(1).
 		Return(nil)
 	store.EXPECT().
@@ -290,9 +361,9 @@ func TestChangePasswordAPI(t *testing.T) {
 					UpdateAdminUserPassword(gomock.Any(), eqUpdateAdminUserPasswordParams(user.ID, newPassword)).
 					Times(1).
 					Return(nil)
-				// 改完密碼刪掉目前的 session，強制重新登入
+				// 改完密碼刪掉目前的 session 與反查索引，強制重新登入
 				cacheMock.EXPECT().
-					Del(gomock.Any(), gomock.Eq(sessionKey("fake-token"))).
+					Del(gomock.Any(), gomock.Eq(sessionKey("fake-token")), gomock.Eq(adminSessionKey(user.ID))).
 					Times(1).
 					Return(nil)
 				store.EXPECT().

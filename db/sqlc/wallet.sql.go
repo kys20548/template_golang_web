@@ -11,7 +11,10 @@ import (
 )
 
 const countWallets = `-- name: CountWallets :one
-SELECT count(*) FROM wallets
+SELECT count(*)
+FROM wallets w
+JOIN users u ON u.id = w.user_id
+WHERE u.deleted_at IS NULL
 `
 
 func (q *Queries) CountWallets(ctx context.Context) (int64, error) {
@@ -45,6 +48,7 @@ const listWallets = `-- name: ListWallets :many
 SELECT w.id, w.user_id, u.username, u.email, w.balance, w.created_at
 FROM wallets w
 JOIN users u ON u.id = w.user_id
+WHERE u.deleted_at IS NULL
 ORDER BY w.id
 LIMIT $1
 OFFSET $2
@@ -64,6 +68,7 @@ type ListWalletsRow struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// 錢包列表只顯示未刪除的前台使用者
 func (q *Queries) ListWallets(ctx context.Context, arg ListWalletsParams) ([]ListWalletsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listWallets, arg.Limit, arg.Offset)
 	if err != nil {

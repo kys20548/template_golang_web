@@ -8,20 +8,34 @@ INSERT INTO admin_users (
 
 -- name: GetAdminUser :one
 SELECT * FROM admin_users
-WHERE id = $1 LIMIT 1;
+WHERE id = $1 AND deleted_at IS NULL
+LIMIT 1;
 
 -- name: GetAdminUserByUsername :one
 SELECT * FROM admin_users
-WHERE username = $1 LIMIT 1;
+WHERE username = $1 AND deleted_at IS NULL
+LIMIT 1;
 
 -- name: ListAdminUsers :many
 SELECT * FROM admin_users
+WHERE (sqlc.arg(include_deleted)::bool OR deleted_at IS NULL)
 ORDER BY id
-LIMIT $1
-OFFSET $2;
+LIMIT sqlc.arg(page_limit)
+OFFSET sqlc.arg(page_offset);
 
 -- name: CountAdminUsers :one
-SELECT count(*) FROM admin_users;
+SELECT count(*) FROM admin_users
+WHERE (sqlc.arg(include_deleted)::bool OR deleted_at IS NULL);
+
+-- name: SoftDeleteAdminUser :execrows
+UPDATE admin_users
+SET deleted_at = now()
+WHERE id = $1 AND deleted_at IS NULL;
+
+-- name: RestoreAdminUser :execrows
+UPDATE admin_users
+SET deleted_at = NULL
+WHERE id = $1 AND deleted_at IS NOT NULL;
 
 -- name: UpdateAdminUserPassword :exec
 UPDATE admin_users

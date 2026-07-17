@@ -10,9 +10,9 @@ import (
 )
 
 type Querier interface {
-	CountAdminUsers(ctx context.Context) (int64, error)
+	CountAdminUsers(ctx context.Context, includeDeleted bool) (int64, error)
 	CountOperationLogs(ctx context.Context) (int64, error)
-	CountUsers(ctx context.Context) (int64, error)
+	CountUsers(ctx context.Context, includeDeleted bool) (int64, error)
 	CountWallets(ctx context.Context) (int64, error)
 	CreateAdminUser(ctx context.Context, arg CreateAdminUserParams) (AdminUser, error)
 	CreateAdminUserRole(ctx context.Context, arg CreateAdminUserRoleParams) error
@@ -21,9 +21,9 @@ type Querier interface {
 	CreateWallet(ctx context.Context, userID int64) (Wallet, error)
 	DeleteAdminUserRoles(ctx context.Context, adminUserID int64) error
 	DeleteOperationLogsBefore(ctx context.Context, createdAt time.Time) (int64, error)
-	DeleteUser(ctx context.Context, id int64) error
 	GetAdminUser(ctx context.Context, id int64) (AdminUser, error)
 	GetAdminUserByUsername(ctx context.Context, username string) (AdminUser, error)
+	// GetUser 不過濾 deleted_at：後台以 ID 查詳情時，已刪除者也要能查到
 	GetUser(ctx context.Context, id int64) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
 	ListAdminUserRoles(ctx context.Context) ([]ListAdminUserRolesRow, error)
@@ -33,7 +33,12 @@ type Querier interface {
 	ListRolePermissions(ctx context.Context) ([]ListRolePermissionsRow, error)
 	ListRoles(ctx context.Context) ([]Role, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
+	// 錢包列表只顯示未刪除的前台使用者
 	ListWallets(ctx context.Context, arg ListWalletsParams) ([]ListWalletsRow, error)
+	RestoreAdminUser(ctx context.Context, id int64) (int64, error)
+	RestoreUser(ctx context.Context, id int64) (int64, error)
+	SoftDeleteAdminUser(ctx context.Context, id int64) (int64, error)
+	SoftDeleteUser(ctx context.Context, id int64) (int64, error)
 	UpdateAdminUserPassword(ctx context.Context, arg UpdateAdminUserPasswordParams) error
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
 }
