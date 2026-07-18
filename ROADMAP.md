@@ -2,6 +2,10 @@
 
 功能演進紀錄與待辦。設計理由與實作細節見 [NOTES.md](NOTES.md)。
 
+> **本模板專案已告一段落**：橫切面基礎設施與開發慣例已穩定，不再主動打磨。
+> 後續以 fork/copy 開各領域後台專案（電商、交易所營運後台、ERP…），
+> 領域專案中做出的通用件（冪等、匯出、上傳等）再回流本模板。
+
 ## 已完成
 
 - [x] **後台管理頁面**（`web/`）：sidebar 版型 + 前台使用者列表/依 ID 查詢
@@ -39,15 +43,16 @@
       錢包總餘額、今日操作數（本地時區當天 0 點起）；不掛 permMiddleware，
       回應內各統計依登入者權限個別過濾（無權限的欄位 null，前端只顯示有值的卡片）
 
-## 待做（依序）
-- [ ] **Prometheus + Grafana 監控**（本地/demo 環境，Render 跑不了 sidecar）—
-      gin middleware 收 request duration histogram（路由/狀態碼 label）、
-      `/metrics` 不對外（獨立 port 或不過 CORS）、asynq exporter、
-      業務指標（登入成功/失敗、錢包異動）；Prometheus + Grafana 進 docker compose，
-      Grafana dashboard 用 provisioning 檔案進版控
+## 待做（有實際場景再加）
+
 - [ ] **kafka** — 有實際場景再加；原則：獨立 goroutine 執行、
       掛掉只記 log 不拖垮 HTTP server，graceful shutdown 時一併優雅關閉
 
 ## 明確不做
 
 模板定位是 code，運維交給部署方：log 收集/alerting、secrets 管理、壓測。
+
+- **Prometheus + Grafana 監控** — 偏運維，劃給部署方（compose 的 monitoring
+  profile 已可起 Prometheus/Loki/Alloy/Grafana）。若領域專案需要指標，
+  只有「埋點」層（gin metrics middleware、業務 counter、`/metrics` 端點）
+  值得回流模板，監控棧留在各專案的部署配置。
